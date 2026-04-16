@@ -10,14 +10,16 @@ If you need a broader Lokalise command set, use the [official CLI instead](https
 
 Detailed command docs are generated in:
 
-- `docs/lokex-cli_upload.md`
-- `docs/lokex-cli_download.md`
+- [`docs/lokex-cli_upload.md`](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli_upload.md)
+- [`docs/lokex-cli_download.md`](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli_download.md)
 
 Those files list all supported flags and API-related parameters for each command.
 
 ## Global flags
 
 These flags are shared by both `upload` and `download`.
+
+> [Find full list of global flags in the docs](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli.md).
 
 ### Required in all cases
 
