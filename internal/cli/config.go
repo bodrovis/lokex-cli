@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -22,17 +22,11 @@ type GlobalConfig struct {
 	PollMaxWait     time.Duration
 }
 
-func NewGlobalConfig() *GlobalConfig {
-	return &GlobalConfig{
-		MaxRetries: -1,
-	}
-}
-
 func BindPersistentFlags(fs *pflag.FlagSet, cfg *GlobalConfig) {
 	fs.StringVar(&cfg.Token, "token", "", "Lokalise API token")
 	fs.StringVar(&cfg.ProjectID, "project-id", "", "Lokalise project ID")
 	fs.StringVar(&cfg.BaseURL, "base-url", "", "Override Lokalise API base URL")
-	fs.StringVar(&cfg.UserAgent, "user-agent", "", "Override User-Agent header")
+	fs.StringVar(&cfg.UserAgent, "user-agent", cfg.UserAgent, "User-Agent header")
 	fs.DurationVar(&cfg.HTTPTimeout, "http-timeout", 0, "HTTP client timeout (e.g. 30s, 1m). 0 means library default")
 	fs.IntVar(&cfg.MaxRetries, "retries", -1, "Number of retries after the first attempt. -1 means library default")
 	fs.DurationVar(&cfg.InitialBackoff, "backoff-initial", 0, "Initial retry backoff (e.g. 400ms, 1s). 0 means library default")
@@ -41,12 +35,12 @@ func BindPersistentFlags(fs *pflag.FlagSet, cfg *GlobalConfig) {
 	fs.DurationVar(&cfg.PollMaxWait, "poll-max-wait", 0, "Maximum total wait for polling (e.g. 120s, 5m). 0 means library default")
 }
 
-func (cfg *GlobalConfig) ValidateAPIConfig() error {
+func (cfg *GlobalConfig) ValidateClientConfig() error {
 	if strings.TrimSpace(cfg.Token) == "" {
-		return fmt.Errorf("--token is required")
+		return errors.New("--token is required")
 	}
 	if strings.TrimSpace(cfg.ProjectID) == "" {
-		return fmt.Errorf("--project-id is required")
+		return errors.New("--project-id is required")
 	}
 	return nil
 }

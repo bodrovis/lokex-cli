@@ -32,7 +32,7 @@ func NewCommand(cfg *cli.GlobalConfig) *cobra.Command {
 }
 
 func validateCommand(cfg *cli.GlobalConfig, flags *Flags) error {
-	if err := cfg.ValidateAPIConfig(); err != nil {
+	if err := cfg.ValidateClientConfig(); err != nil {
 		return err
 	}
 

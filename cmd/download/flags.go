@@ -57,6 +57,8 @@ func newFlags() *Flags {
 }
 
 func bindFlags(cmd *cobra.Command, flags *Flags) {
+	cmd.Flags().SortFlags = false
+
 	cmd.Flags().StringVar(
 		&flags.Out,
 		"out",
@@ -64,11 +66,11 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Directory to unzip downloaded bundle into",
 	)
 
-	cmd.Flags().StringVar(
-		&flags.Format,
-		"format",
-		"",
-		"File format (e.g. json, strings, xml)",
+	cmd.Flags().BoolVar(
+		&flags.Async,
+		"async",
+		false,
+		"Use Lokalise async download flow",
 	)
 
 	cmd.Flags().DurationVar(
@@ -78,11 +80,12 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Overall command timeout (e.g. 30s, 2m). 0 disables the timeout",
 	)
 
-	cmd.Flags().BoolVar(
-		&flags.Async,
-		"async",
-		false,
-		"Use Lokalise async download flow",
+	// Required / primary API input
+	cmd.Flags().StringVar(
+		&flags.Format,
+		"format",
+		"",
+		"File format (e.g. json, strings, xml)",
 	)
 
 	cmd.Flags().BoolVar(
@@ -113,6 +116,7 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Include all platform keys",
 	)
 
+	// Filtering / selection
 	cmd.Flags().StringSliceVar(
 		&flags.FilterLangs,
 		"filter-langs",
@@ -132,13 +136,6 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"filter-filenames",
 		nil,
 		"Only include keys attributed to selected files",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.AddNewlineEOF,
-		"add-newline-eof",
-		false,
-		"Add newline at end of file when supported",
 	)
 
 	cmd.Flags().StringSliceVar(
@@ -162,6 +159,50 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Exclude keys with these tags",
 	)
 
+	cmd.Flags().StringSliceVar(
+		&flags.IncludePIDs,
+		"include-pids",
+		nil,
+		"Include keys from other project IDs",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&flags.FilterRepositories,
+		"filter-repositories",
+		nil,
+		"Only process selected repositories in organization/repository format",
+	)
+
+	cmd.Flags().Int64Var(
+		&flags.FilterTaskID,
+		"filter-task-id",
+		0,
+		"Only include keys attributed to this task (offline_xliff only)",
+	)
+
+	// Content / metadata inclusion
+	cmd.Flags().BoolVar(
+		&flags.IncludeComments,
+		"include-comments",
+		false,
+		"Include key comments and description when supported",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.IncludeDescription,
+		"include-description",
+		false,
+		"Include key description when supported",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.AddNewlineEOF,
+		"add-newline-eof",
+		false,
+		"Add newline at end of file when supported",
+	)
+
+	// Export formatting / transformations
 	cmd.Flags().StringVar(
 		&flags.ExportSort,
 		"export-sort",
@@ -181,41 +222,6 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"export-null-as",
 		"",
 		"How to export null translations (Ruby on Rails YAML only)",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.IncludeComments,
-		"include-comments",
-		false,
-		"Include key comments and description when supported",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.IncludeDescription,
-		"include-description",
-		false,
-		"Include key description when supported",
-	)
-
-	cmd.Flags().StringSliceVar(
-		&flags.IncludePIDs,
-		"include-pids",
-		nil,
-		"Include keys from other project IDs",
-	)
-
-	cmd.Flags().StringSliceVar(
-		&flags.Triggers,
-		"triggers",
-		nil,
-		"Trigger integration exports",
-	)
-
-	cmd.Flags().StringSliceVar(
-		&flags.FilterRepositories,
-		"filter-repositories",
-		nil,
-		"Only process selected repositories in organization/repository format",
 	)
 
 	cmd.Flags().BoolVar(
@@ -244,20 +250,6 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"placeholder-format",
 		"",
 		"Override default placeholder format",
-	)
-
-	cmd.Flags().StringVar(
-		&flags.WebhookURL,
-		"webhook-url",
-		"",
-		"Send POST with generated bundle URL to this URL when export completes",
-	)
-
-	cmd.Flags().StringVar(
-		&flags.LanguageMappingJSON,
-		"language-mapping",
-		"",
-		"Language mapping as JSON array of objects",
 	)
 
 	cmd.Flags().BoolVar(
@@ -309,24 +301,39 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Separator for Java .properties export",
 	)
 
-	cmd.Flags().StringVar(
-		&flags.BundleDescription,
-		"bundle-description",
-		"",
-		"Description for ios_sdk/android_sdk OTA SDK bundles",
-	)
-
-	cmd.Flags().Int64Var(
-		&flags.FilterTaskID,
-		"filter-task-id",
-		0,
-		"Only include keys attributed to this task (offline_xliff only)",
-	)
-
 	cmd.Flags().BoolVar(
 		&flags.Compact,
 		"compact",
 		false,
 		"Export compact ARB structure",
+	)
+
+	// Integrations / advanced
+	cmd.Flags().StringSliceVar(
+		&flags.Triggers,
+		"triggers",
+		nil,
+		"Trigger integration exports",
+	)
+
+	cmd.Flags().StringVar(
+		&flags.WebhookURL,
+		"webhook-url",
+		"",
+		"Send POST with generated bundle URL to this URL when export completes",
+	)
+
+	cmd.Flags().StringVar(
+		&flags.LanguageMappingJSON,
+		"language-mapping",
+		"",
+		"Language mapping as JSON array of objects",
+	)
+
+	cmd.Flags().StringVar(
+		&flags.BundleDescription,
+		"bundle-description",
+		"",
+		"Description for ios_sdk/android_sdk OTA SDK bundles",
 	)
 }

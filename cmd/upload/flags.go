@@ -38,34 +38,9 @@ type Flags struct {
 }
 
 func bindFlags(cmd *cobra.Command, flags *Flags) {
-	cmd.Flags().StringVar(
-		&flags.Filename,
-		"filename",
-		"",
-		"Filename sent to Lokalise (required)",
-	)
+	cmd.Flags().SortFlags = false
 
-	cmd.Flags().StringVar(
-		&flags.SrcPath,
-		"src-path",
-		"",
-		"Local path to read file contents from (optional)",
-	)
-
-	cmd.Flags().StringVar(
-		&flags.Data,
-		"data",
-		"",
-		"Base64-encoded file contents (optional; if set, file is not read from disk)",
-	)
-
-	cmd.Flags().StringVar(
-		&flags.LangISO,
-		"lang-iso",
-		"",
-		"Language code of the translations in the file (required)",
-	)
-
+	// Runtime / command behavior
 	cmd.Flags().BoolVar(
 		&flags.Poll,
 		"poll",
@@ -80,20 +55,44 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Overall command timeout (e.g. 30s, 2m). 0 disables the timeout",
 	)
 
-	cmd.Flags().BoolVar(
-		&flags.ConvertPlaceholders,
-		"convert-placeholders",
-		false,
-		"Convert placeholders to Lokalise universal placeholders",
+	cmd.Flags().StringVar(
+		&flags.SrcPath,
+		"src-path",
+		"",
+		"Local path to read file contents from (optional)",
 	)
 
-	cmd.Flags().BoolVar(
-		&flags.DetectICUPlurals,
-		"detect-icu-plurals",
-		false,
-		"Automatically detect and parse ICU plurals",
+	// Required / primary input
+	cmd.Flags().StringVar(
+		&flags.Filename,
+		"filename",
+		"",
+		"Filename sent to Lokalise (required)",
 	)
 
+	cmd.Flags().StringVar(
+		&flags.LangISO,
+		"lang-iso",
+		"",
+		"Language code of the translations in the file (required)",
+	)
+
+	// File source / input mode
+	cmd.Flags().StringVar(
+		&flags.Data,
+		"data",
+		"",
+		"Base64-encoded file contents (optional; if set, file is not read from disk)",
+	)
+
+	cmd.Flags().StringVar(
+		&flags.Format,
+		"format",
+		"",
+		"File format (e.g. json, strings, xml)",
+	)
+
+	// Tagging / statuses
 	cmd.Flags().StringSliceVar(
 		&flags.Tags,
 		"tags",
@@ -120,6 +119,49 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"tag-skipped-keys",
 		false,
 		"Add tags to skipped keys",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&flags.CustomTranslationStatusIDs,
+		"custom-translation-status-ids",
+		nil,
+		"Custom translation status IDs to add",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.CustomTranslationStatusInsertedKeys,
+		"custom-translation-status-inserted-keys",
+		false,
+		"Add custom statuses to inserted keys",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.CustomTranslationStatusUpdatedKeys,
+		"custom-translation-status-updated-keys",
+		false,
+		"Add custom statuses to updated keys",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.CustomTranslationStatusSkippedKeys,
+		"custom-translation-status-skipped-keys",
+		false,
+		"Add custom statuses to skipped keys",
+	)
+
+	// Import behavior
+	cmd.Flags().BoolVar(
+		&flags.ConvertPlaceholders,
+		"convert-placeholders",
+		false,
+		"Convert placeholders to Lokalise universal placeholders",
+	)
+
+	cmd.Flags().BoolVar(
+		&flags.DetectICUPlurals,
+		"detect-icu-plurals",
+		false,
+		"Automatically detect and parse ICU plurals",
 	)
 
 	cmd.Flags().BoolVar(
@@ -178,34 +220,6 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Delete keys/translations not present in the uploaded file",
 	)
 
-	cmd.Flags().StringSliceVar(
-		&flags.CustomTranslationStatusIDs,
-		"custom-translation-status-ids",
-		nil,
-		"Custom translation status IDs to add",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.CustomTranslationStatusInsertedKeys,
-		"custom-translation-status-inserted-keys",
-		false,
-		"Add custom statuses to inserted keys",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.CustomTranslationStatusUpdatedKeys,
-		"custom-translation-status-updated-keys",
-		false,
-		"Add custom statuses to updated keys",
-	)
-
-	cmd.Flags().BoolVar(
-		&flags.CustomTranslationStatusSkippedKeys,
-		"custom-translation-status-skipped-keys",
-		false,
-		"Add custom statuses to skipped keys",
-	)
-
 	cmd.Flags().BoolVar(
 		&flags.SkipDetectLangISO,
 		"skip-detect-lang-iso",
@@ -213,13 +227,7 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 		"Skip automatic language detection by filename",
 	)
 
-	cmd.Flags().StringVar(
-		&flags.Format,
-		"format",
-		"",
-		"File format (e.g. json, strings, xml)",
-	)
-
+	// Task-related / advanced
 	cmd.Flags().Int64Var(
 		&flags.FilterTaskID,
 		"filter-task-id",

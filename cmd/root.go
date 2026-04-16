@@ -15,11 +15,21 @@ import (
 var version = "dev"
 
 func RootCmd() *cobra.Command {
-	cfg := cli.NewGlobalConfig()
+	cfg := &cli.GlobalConfig{
+		UserAgent: fmt.Sprintf("lokex-cli/%s", version),
+	}
 
 	rootCmd := &cobra.Command{
-		Use:              "lokex-cli",
-		Short:            "CLI for uploading and downloading files with Lokalise",
+		Use:   "lokex-cli",
+		Short: "CLI for uploading and downloading files with Lokalise",
+		Long: `lokex-cli is a focused CLI built on top of Lokex for fast file exchange with Lokalise.
+
+It is intentionally limited to two core operations:
+  - upload files
+  - download files
+
+This tool is optimized for import/export workflows and direct access to file-related API parameters.
+`,
 		TraverseChildren: true,
 		SilenceUsage:     true,
 		SilenceErrors:    true,
