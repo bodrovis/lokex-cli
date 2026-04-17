@@ -37,6 +37,12 @@ type Flags struct {
 	FilterTaskID                        int64
 }
 
+func newFlags() *Flags {
+	return &Flags{
+		ContextTimeout: 150 * time.Second,
+	}
+}
+
 func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().SortFlags = false
 
@@ -44,21 +50,21 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().BoolVar(
 		&flags.Poll,
 		"poll",
-		false,
+		flags.Poll,
 		"Wait until Lokalise finishes processing the upload",
 	)
 
 	cmd.Flags().DurationVar(
 		&flags.ContextTimeout,
 		"context-timeout",
-		150*time.Second,
+		flags.ContextTimeout,
 		"Overall command timeout (e.g. 30s, 2m). 0 disables the timeout",
 	)
 
 	cmd.Flags().StringVar(
 		&flags.SrcPath,
 		"src-path",
-		"",
+		flags.SrcPath,
 		"Local path to read file contents from (optional)",
 	)
 
@@ -66,14 +72,14 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().StringVar(
 		&flags.Filename,
 		"filename",
-		"",
+		flags.Filename,
 		"Filename sent to Lokalise (required)",
 	)
 
 	cmd.Flags().StringVar(
 		&flags.LangISO,
 		"lang-iso",
-		"",
+		flags.LangISO,
 		"Language code of the translations in the file (required)",
 	)
 
@@ -81,14 +87,14 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().StringVar(
 		&flags.Data,
 		"data",
-		"",
+		flags.Data,
 		"Base64-encoded file contents (optional; if set, file is not read from disk)",
 	)
 
 	cmd.Flags().StringVar(
 		&flags.Format,
 		"format",
-		"",
+		flags.Format,
 		"File format (e.g. json, strings, xml)",
 	)
 
@@ -96,56 +102,56 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().StringSliceVar(
 		&flags.Tags,
 		"tags",
-		nil,
+		flags.Tags,
 		"Tags to apply to keys",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.TagInsertedKeys,
 		"tag-inserted-keys",
-		false,
+		flags.TagInsertedKeys,
 		"Add tags to inserted keys",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.TagUpdatedKeys,
 		"tag-updated-keys",
-		false,
+		flags.TagUpdatedKeys,
 		"Add tags to updated keys",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.TagSkippedKeys,
 		"tag-skipped-keys",
-		false,
+		flags.TagSkippedKeys,
 		"Add tags to skipped keys",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&flags.CustomTranslationStatusIDs,
 		"custom-translation-status-ids",
-		nil,
+		flags.CustomTranslationStatusIDs,
 		"Custom translation status IDs to add",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.CustomTranslationStatusInsertedKeys,
 		"custom-translation-status-inserted-keys",
-		false,
+		flags.CustomTranslationStatusInsertedKeys,
 		"Add custom statuses to inserted keys",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.CustomTranslationStatusUpdatedKeys,
 		"custom-translation-status-updated-keys",
-		false,
+		flags.CustomTranslationStatusUpdatedKeys,
 		"Add custom statuses to updated keys",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.CustomTranslationStatusSkippedKeys,
 		"custom-translation-status-skipped-keys",
-		false,
+		flags.CustomTranslationStatusSkippedKeys,
 		"Add custom statuses to skipped keys",
 	)
 
@@ -153,77 +159,77 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().BoolVar(
 		&flags.ConvertPlaceholders,
 		"convert-placeholders",
-		false,
+		flags.ConvertPlaceholders,
 		"Convert placeholders to Lokalise universal placeholders",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.DetectICUPlurals,
 		"detect-icu-plurals",
-		false,
+		flags.DetectICUPlurals,
 		"Automatically detect and parse ICU plurals",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.ReplaceModified,
 		"replace-modified",
-		false,
+		flags.ReplaceModified,
 		"Replace modified translations from the uploaded file",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.SlashNToLinebreak,
 		"slashn-to-linebreak",
-		false,
+		flags.SlashNToLinebreak,
 		"Replace \\n with a real line break",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.KeysToValues,
 		"keys-to-values",
-		false,
+		flags.KeysToValues,
 		"Replace values with key names",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.DistinguishByFile,
 		"distinguish-by-file",
-		false,
+		flags.DistinguishByFile,
 		"Allow same key names to coexist across different filenames",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.ApplyTM,
 		"apply-tm",
-		false,
+		flags.ApplyTM,
 		"Apply 100% translation memory matches",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.UseAutomations,
 		"use-automations",
-		false,
+		flags.UseAutomations,
 		"Run automations for this upload",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.HiddenFromContributors,
 		"hidden-from-contributors",
-		false,
+		flags.HiddenFromContributors,
 		"Mark newly created keys as hidden from contributors",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.CleanupMode,
 		"cleanup-mode",
-		false,
+		flags.CleanupMode,
 		"Delete keys/translations not present in the uploaded file",
 	)
 
 	cmd.Flags().BoolVar(
 		&flags.SkipDetectLangISO,
 		"skip-detect-lang-iso",
-		false,
+		flags.SkipDetectLangISO,
 		"Skip automatic language detection by filename",
 	)
 
@@ -231,7 +237,7 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().Int64Var(
 		&flags.FilterTaskID,
 		"filter-task-id",
-		0,
+		flags.FilterTaskID,
 		"Apply import results as a part of a task (offline_xliff only)",
 	)
 }

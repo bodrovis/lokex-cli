@@ -69,7 +69,7 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().BoolVar(
 		&flags.Async,
 		"async",
-		false,
+		flags.Async,
 		"Use Lokalise async download flow",
 	)
 
@@ -84,7 +84,7 @@ func bindFlags(cmd *cobra.Command, flags *Flags) {
 	cmd.Flags().StringVar(
 		&flags.Format,
 		"format",
-		"",
+		flags.Format,
 		"File format (e.g. json, strings, xml)",
 	)
 

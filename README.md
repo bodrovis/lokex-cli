@@ -166,6 +166,67 @@ So the normal upload flow is:
 - provide `--lang-iso`
 - let the tool read and encode the file itself
 
+## Passing arrays and JSON via CLI
+
+Some flags accept arrays (lists of values) or structured JSON. Here is how to pass them in a shell.
+
+### String arrays
+
+Flags like `--filter-langs`, `--include-tags`, etc. accept multiple values.
+
+You can pass them in two ways:
+
+#### Comma-separated
+
+```
+lokex-cli download \
+  --format=json \
+  --filter-langs=en,fr,de \
+  --include-tags=mobile,web
+```
+
+#### Repeated flags
+
+```
+lokex-cli download \
+  --format=json \
+  --filter-langs=en \
+  --filter-langs=fr \
+  --filter-langs=de
+```
+
+### JSON arrays
+
+Some flags like `--language-mapping` expect structured JSON (array of objects).
+
+Example:
+
+```
+lokex-cli download \
+  --format=json \
+  --language-mapping='[
+    {"lang_iso":"en","custom_iso":"en_US"},
+    {"lang_iso":"pt","custom_iso":"pt_BR"}
+  ]'
+```
+
+**Important notes**:
+
+- Always wrap JSON in quotes ('...') to prevent the shell from interpreting it.
+- On Windows (PowerShell), you may need to use double quotes:
+
+```
+--language-mapping "[{\"lang_iso\":\"en\",\"custom_iso\":\"en_US\"}]"
+```
+
+## Testing
+
+Run:
+
+```
+go test -count=1 ./... -shuffle=on -race
+```
+
 ## License
 
 (c) [Elijah S. Krukowski](https://bodrovis.tech). Licensed under BSD 3-Clause

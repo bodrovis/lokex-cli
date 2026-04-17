@@ -3,25 +3,35 @@ package download
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/bodrovis/lokex-cli/internal/cli"
+	downloadCfg "github.com/bodrovis/lokex-cli/internal/download_config"
+	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
 )
 
-func NewCommand(cfg *cli.GlobalConfig) *cobra.Command {
+type downloader interface {
+	Download(ctx context.Context, out string, params lokexdownload.DownloadParams) (string, error)
+	DownloadAsync(ctx context.Context, out string, params lokexdownload.DownloadParams) (string, error)
+}
+
+var newDownloaderFunc = newDownloader
+
+func NewCommand(cfg *globalCfg.GlobalConfig, defaults *downloadCfg.DownloadConfig) *cobra.Command {
 	flags := newFlags()
 
 	cmd := &cobra.Command{
 		Use:   "download",
 		Short: "Download translation files from Lokalise",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			applyDefaults(cmd, flags, defaults)
 			return validateCommand(cfg, flags)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCommand(cmd, cfg, flags)
+			return runCommand(cmd, cfg, flags, defaults)
 		},
 	}
 
@@ -30,20 +40,20 @@ func NewCommand(cfg *cli.GlobalConfig) *cobra.Command {
 	return cmd
 }
 
-func validateCommand(cfg *cli.GlobalConfig, flags *Flags) error {
+func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
 	if err := cfg.ValidateClientConfig(); err != nil {
 		return err
 	}
 
-	if flags.Format == "" {
+	if strings.TrimSpace(flags.Format) == "" {
 		return fmt.Errorf("--format is required")
 	}
 
 	return nil
 }
 
-func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
-	downloader, err := newDownloader(cfg)
+func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, defaults *downloadCfg.DownloadConfig) error {
+	dl, err := newDownloaderFunc(cfg)
 	if err != nil {
 		return err
 	}
@@ -51,12 +61,12 @@ func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
 	ctx, cancel := newCommandContext(flags.ContextTimeout)
 	defer cancel()
 
-	params, err := buildParams(cmd, flags)
+	params, err := buildParams(cmd, flags, defaults)
 	if err != nil {
 		return err
 	}
 
-	url, err := performDownload(ctx, downloader, flags, params)
+	url, err := performDownload(ctx, dl, flags, params)
 	if err != nil {
 		return err
 	}
@@ -66,7 +76,7 @@ func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
 	return nil
 }
 
-func newDownloader(cfg *cli.GlobalConfig) (*lokexdownload.Downloader, error) {
+func newDownloader(cfg *globalCfg.GlobalConfig) (downloader, error) {
 	client, err := cfg.NewClient()
 	if err != nil {
 		return nil, err
@@ -89,15 +99,15 @@ func printDownloadResult(cmd *cobra.Command, url string) {
 
 func performDownload(
 	ctx context.Context,
-	downloader *lokexdownload.Downloader,
+	dl downloader,
 	flags *Flags,
 	params lokexdownload.DownloadParams,
 ) (string, error) {
 	if flags.Async {
-		return downloader.DownloadAsync(ctx, flags.Out, params)
+		return dl.DownloadAsync(ctx, flags.Out, params)
 	}
 
-	return downloader.Download(ctx, flags.Out, params)
+	return dl.Download(ctx, flags.Out, params)
 }
 
 func truncateURLForOutput(url string, max int) string {

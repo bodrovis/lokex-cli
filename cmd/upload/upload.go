@@ -8,21 +8,29 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/bodrovis/lokex-cli/internal/cli"
+	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
+	uploadCfg "github.com/bodrovis/lokex-cli/internal/upload_config"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
 )
 
-func NewCommand(cfg *cli.GlobalConfig) *cobra.Command {
-	flags := &Flags{}
+type uploader interface {
+	Upload(ctx context.Context, params lokexupload.UploadParams, srcPath string, poll bool) (string, error)
+}
+
+var newUploaderFunc = newUploader
+
+func NewCommand(cfg *globalCfg.GlobalConfig, defaults *uploadCfg.UploadConfig) *cobra.Command {
+	flags := newFlags()
 
 	cmd := &cobra.Command{
 		Use:   "upload",
 		Short: "Upload translation files to Lokalise",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			applyDefaults(cmd, flags, defaults)
 			return validateCommand(cfg, flags)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCommand(cmd, cfg, flags)
+			return runCommand(cmd, cfg, flags, defaults)
 		},
 	}
 
@@ -31,7 +39,7 @@ func NewCommand(cfg *cli.GlobalConfig) *cobra.Command {
 	return cmd
 }
 
-func validateCommand(cfg *cli.GlobalConfig, flags *Flags) error {
+func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
 	if err := cfg.ValidateClientConfig(); err != nil {
 		return err
 	}
@@ -47,8 +55,8 @@ func validateCommand(cfg *cli.GlobalConfig, flags *Flags) error {
 	return nil
 }
 
-func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
-	uploader, err := newUploader(cfg)
+func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, defaults *uploadCfg.UploadConfig) error {
+	up, err := newUploaderFunc(cfg)
 	if err != nil {
 		return err
 	}
@@ -56,9 +64,9 @@ func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
 	ctx, cancel := newCommandContext(flags.ContextTimeout)
 	defer cancel()
 
-	params := buildParams(cmd, flags)
+	params := buildParams(cmd, flags, defaults)
 
-	result, err := performUpload(ctx, uploader, flags, params)
+	result, err := performUpload(ctx, up, flags, params)
 	if err != nil {
 		return err
 	}
@@ -68,7 +76,7 @@ func runCommand(cmd *cobra.Command, cfg *cli.GlobalConfig, flags *Flags) error {
 	return nil
 }
 
-func newUploader(cfg *cli.GlobalConfig) (*lokexupload.Uploader, error) {
+func newUploader(cfg *globalCfg.GlobalConfig) (uploader, error) {
 	client, err := cfg.NewClient()
 	if err != nil {
 		return nil, err
@@ -87,11 +95,11 @@ func newCommandContext(timeout time.Duration) (context.Context, context.CancelFu
 
 func performUpload(
 	ctx context.Context,
-	uploader *lokexupload.Uploader,
+	up uploader,
 	flags *Flags,
 	params lokexupload.UploadParams,
 ) (string, error) {
-	return uploader.Upload(ctx, params, flags.SrcPath, flags.Poll)
+	return up.Upload(ctx, params, flags.SrcPath, flags.Poll)
 }
 
 func printUploadResult(cmd *cobra.Command, result string, poll bool) {
