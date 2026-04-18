@@ -641,12 +641,12 @@ func TestRunCommand_PassesContextToDownloader(t *testing.T) {
 			}
 
 			cfg := &globalCfg.GlobalConfig{
-				Token:     "token",
-				ProjectID: "project-id",
+				Token:          "token",
+				ProjectID:      "project-id",
+				ContextTimeout: tt.timeout,
 			}
 			flags := newFlags()
 			flags.Format = "json"
-			flags.ContextTimeout = tt.timeout
 
 			cmd := newBoundTestCommand(flags)
 			var out bytes.Buffer

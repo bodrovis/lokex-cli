@@ -73,4 +73,8 @@ func ApplyGlobalDefaults(cmd *cobra.Command, cfg *GlobalConfig, input *GlobalCon
 	if !cmd.Flags().Changed("poll-max-wait") && input.PollMaxWait != nil {
 		cfg.PollMaxWait = *input.PollMaxWait
 	}
+
+	if !cmd.Flags().Changed("context-timeout") && input.ContextTimeout != nil {
+		cfg.ContextTimeout = *input.ContextTimeout
+	}
 }

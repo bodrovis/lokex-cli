@@ -1,8 +1,6 @@
 package download
 
 import (
-	"time"
-
 	params "github.com/bodrovis/lokex-cli/internal/params"
 	vh "github.com/bodrovis/lokex-cli/internal/viper_helpers"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
@@ -59,28 +57,6 @@ var downloadParamSpecs = []DownloadParamSpec{
 		ApplyToRequest: reqDirectString("format", func(f *Flags) string {
 			return f.Format
 		}),
-	},
-	{
-		FlagName:  "context-timeout",
-		ConfigKey: "download.context-timeout",
-		BindFlag: func(cmd *cobra.Command, flags *Flags) {
-			cmd.Flags().DurationVar(
-				&flags.ContextTimeout,
-				"context-timeout",
-				flags.ContextTimeout,
-				"Overall command timeout (e.g. 30s, 2m). 0 disables the timeout",
-			)
-		},
-		ApplyDefault: func(cmd *cobra.Command, flags *Flags, cfg *DownloadConfig) {
-			if !cmd.Flags().Changed("context-timeout") && cfg.ContextTimeout != nil {
-				flags.ContextTimeout = *cfg.ContextTimeout
-			}
-		},
-		LoadFromViper: func(v *viper.Viper, cfg *DownloadConfig) {
-			vh.ApplyConfigValue(v, "download.context-timeout", func(val time.Duration) {
-				cfg.ContextTimeout = &val
-			})
-		},
 	},
 	{
 		FlagName:  "async",

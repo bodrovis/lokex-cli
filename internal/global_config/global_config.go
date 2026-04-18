@@ -15,4 +15,5 @@ type GlobalConfig struct {
 	MaxBackoff      time.Duration
 	PollInitialWait time.Duration
 	PollMaxWait     time.Duration
+	ContextTimeout  time.Duration
 }

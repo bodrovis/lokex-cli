@@ -2,7 +2,6 @@ package upload
 
 import (
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -13,10 +12,6 @@ func TestNewFlags_Defaults(t *testing.T) {
 	flags := newFlags()
 	if flags == nil {
 		t.Fatal("expected non-nil flags")
-	}
-
-	if flags.ContextTimeout != 150*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v, want %v", flags.ContextTimeout, 150*time.Second)
 	}
 
 	if flags.Filename != "" {
@@ -52,7 +47,6 @@ func TestBindFlags_BindsRepresentativeValues(t *testing.T) {
 
 	err := cmd.Flags().Parse([]string{
 		"--poll",
-		"--context-timeout=45s",
 		"--src-path=./locales/en.json",
 		"--filename=admin/main.json",
 		"--lang-iso=en",
@@ -71,9 +65,6 @@ func TestBindFlags_BindsRepresentativeValues(t *testing.T) {
 
 	if !flags.Poll {
 		t.Fatal("expected Poll to be true")
-	}
-	if flags.ContextTimeout != 45*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v", flags.ContextTimeout)
 	}
 	if flags.SrcPath != "./locales/en.json" {
 		t.Fatalf("unexpected SrcPath: got %q", flags.SrcPath)
@@ -124,9 +115,6 @@ func TestBindFlags_PreservesDefaultsWhenNoArgs(t *testing.T) {
 		t.Fatalf("parse flags: %v", err)
 	}
 
-	if flags.ContextTimeout != 150*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v, want %v", flags.ContextTimeout, 150*time.Second)
-	}
 	if flags.Poll {
 		t.Fatal("expected Poll to remain false")
 	}
@@ -159,7 +147,6 @@ func TestBindFlags_PreservesPreconfiguredValues(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	flags := newFlags()
 	flags.Poll = true
-	flags.ContextTimeout = 90 * time.Second
 	flags.SrcPath = "./seed.json"
 	flags.Filename = "seed.json"
 	flags.LangISO = "fr"
@@ -176,9 +163,6 @@ func TestBindFlags_PreservesPreconfiguredValues(t *testing.T) {
 
 	if !flags.Poll {
 		t.Fatal("expected Poll to preserve preconfigured value")
-	}
-	if flags.ContextTimeout != 90*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v", flags.ContextTimeout)
 	}
 	if flags.SrcPath != "./seed.json" {
 		t.Fatalf("unexpected SrcPath: got %q", flags.SrcPath)
@@ -317,7 +301,6 @@ func TestBindFlags_RepresentativeFlagDefaultsMatchCurrentFlags(t *testing.T) {
 		name string
 		want string
 	}{
-		{name: "context-timeout", want: "2m30s"},
 		{name: "filename", want: ""},
 		{name: "src-path", want: ""},
 		{name: "lang-iso", want: ""},

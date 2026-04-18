@@ -2,7 +2,6 @@ package download
 
 import (
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -17,10 +16,6 @@ func TestNewFlags_Defaults(t *testing.T) {
 
 	if flags.Out != "./locales" {
 		t.Fatalf("unexpected Out: got %q, want %q", flags.Out, "./locales")
-	}
-
-	if flags.ContextTimeout != 150*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v, want %v", flags.ContextTimeout, 150*time.Second)
 	}
 
 	if flags.Format != "" {
@@ -43,7 +38,6 @@ func TestBindFlags_BindsRepresentativeValues(t *testing.T) {
 	err := cmd.Flags().Parse([]string{
 		"--out=/tmp/lokex",
 		"--format=json",
-		"--context-timeout=45s",
 		"--async",
 		"--original-filenames",
 		"--bundle-structure=%LANG_ISO%.json",
@@ -62,9 +56,6 @@ func TestBindFlags_BindsRepresentativeValues(t *testing.T) {
 	}
 	if flags.Format != "json" {
 		t.Fatalf("unexpected Format: got %q", flags.Format)
-	}
-	if flags.ContextTimeout != 45*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v", flags.ContextTimeout)
 	}
 	if !flags.Async {
 		t.Fatal("expected Async to be true")
@@ -106,9 +97,6 @@ func TestBindFlags_PreservesDefaultsWhenNoArgs(t *testing.T) {
 
 	if flags.Out != "./locales" {
 		t.Fatalf("unexpected Out: got %q, want %q", flags.Out, "./locales")
-	}
-	if flags.ContextTimeout != 150*time.Second {
-		t.Fatalf("unexpected ContextTimeout: got %v, want %v", flags.ContextTimeout, 150*time.Second)
 	}
 	if flags.Format != "" {
 		t.Fatalf("expected empty Format, got %q", flags.Format)
@@ -238,7 +226,6 @@ func TestBindFlags_RepresentativeFlagDefaultsMatchNewFlags(t *testing.T) {
 		want string
 	}{
 		{name: "out", want: "./locales"},
-		{name: "context-timeout", want: "2m30s"},
 		{name: "format", want: ""},
 		{name: "bundle-structure", want: ""},
 		{name: "language-mapping", want: ""},

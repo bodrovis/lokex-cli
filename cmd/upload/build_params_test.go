@@ -328,11 +328,10 @@ func TestBuildParams_OmitsLocalOnlyFields(t *testing.T) {
 	cmd := newTestCommand()
 
 	flags := &Flags{
-		Filename:       "en.json",
-		LangISO:        "en",
-		SrcPath:        "./local/en.json",
-		Poll:           true,
-		ContextTimeout: 30,
+		Filename: "en.json",
+		LangISO:  "en",
+		SrcPath:  "./local/en.json",
+		Poll:     true,
 	}
 
 	params, err := buildParams(cmd, flags, nil)

@@ -19,6 +19,7 @@ token: file-token
 project-id: file-project
 http-timeout: 45s
 retries: 2
+context-timeout: 100s
 `), 0o644)
 	require.NoError(t, err)
 
@@ -37,6 +38,9 @@ retries: 2
 
 	require.NotNil(t, input.HTTPTimeout)
 	require.Equal(t, 45*time.Second, *input.HTTPTimeout)
+
+	require.NotNil(t, input.ContextTimeout)
+	require.Equal(t, 100*time.Second, *input.ContextTimeout)
 
 	require.NotNil(t, input.MaxRetries)
 	require.Equal(t, 2, *input.MaxRetries)
@@ -64,6 +68,7 @@ backoff-initial: 0s
 backoff-max: 0s
 poll-initial-wait: 0s
 poll-max-wait: 0s
+context-timeout: 0s
 `), 0o644)
 	require.NoError(t, err)
 
@@ -74,6 +79,7 @@ poll-max-wait: 0s
 	require.NoError(t, err)
 
 	require.Equal(t, time.Duration(0), *input.HTTPTimeout)
+	require.Equal(t, time.Duration(0), *input.ContextTimeout)
 	require.Equal(t, -1, *input.MaxRetries)
 	require.Equal(t, time.Duration(0), *input.InitialBackoff)
 	require.Equal(t, time.Duration(0), *input.MaxBackoff)
@@ -98,12 +104,14 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 	timeout := 30 * time.Second
 	retries := 2
 	token := "file-token"
+	contextTimeout := 60 * time.Second
 
 	input := &GlobalConfigInput{
-		Token:       &token,
-		ProjectID:   &projectID,
-		HTTPTimeout: &timeout,
-		MaxRetries:  &retries,
+		Token:          &token,
+		ProjectID:      &projectID,
+		HTTPTimeout:    &timeout,
+		MaxRetries:     &retries,
+		ContextTimeout: &contextTimeout,
 	}
 
 	ApplyGlobalDefaults(cmd, cfg, input)
@@ -111,6 +119,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 	require.Equal(t, "cli-token", cfg.Token)
 	require.Equal(t, "file-project", cfg.ProjectID)
 	require.Equal(t, 30*time.Second, cfg.HTTPTimeout)
+	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
 	require.Equal(t, 2, cfg.MaxRetries)
 }
 
@@ -125,11 +134,13 @@ func TestApplyGlobalDefaults_InputOnly(t *testing.T) {
 	token := "file-token"
 	projectID := "file-project"
 	timeout := 45 * time.Second
+	contextTimeout := 60 * time.Second
 
 	input := &GlobalConfigInput{
-		Token:       &token,
-		ProjectID:   &projectID,
-		HTTPTimeout: &timeout,
+		Token:          &token,
+		ProjectID:      &projectID,
+		HTTPTimeout:    &timeout,
+		ContextTimeout: &contextTimeout,
 	}
 
 	ApplyGlobalDefaults(cmd, cfg, input)
@@ -137,6 +148,7 @@ func TestApplyGlobalDefaults_InputOnly(t *testing.T) {
 	require.Equal(t, "file-token", cfg.Token)
 	require.Equal(t, "file-project", cfg.ProjectID)
 	require.Equal(t, 45*time.Second, cfg.HTTPTimeout)
+	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
 }
 
 func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
@@ -148,6 +160,7 @@ func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
 		MaxBackoff:      2 * time.Second,
 		PollInitialWait: 3 * time.Second,
 		PollMaxWait:     4 * time.Second,
+		ContextTimeout:  5 * time.Second,
 	}
 
 	cmd := &cobra.Command{Use: "test"}
@@ -163,6 +176,7 @@ func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
 		MaxBackoff:      &zeroDuration,
 		PollInitialWait: &zeroDuration,
 		PollMaxWait:     &zeroDuration,
+		ContextTimeout:  &zeroDuration,
 	}
 
 	ApplyGlobalDefaults(cmd, cfg, input)
@@ -173,6 +187,7 @@ func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
 	require.Equal(t, time.Duration(0), cfg.MaxBackoff)
 	require.Equal(t, time.Duration(0), cfg.PollInitialWait)
 	require.Equal(t, time.Duration(0), cfg.PollMaxWait)
+	require.Equal(t, time.Duration(0), cfg.ContextTimeout)
 }
 
 func TestApplyGlobalDefaults_FlagOverridesExplicitZeroFromInput(t *testing.T) {

@@ -263,37 +263,64 @@ func TestPerformUpload(t *testing.T) {
 }
 
 func TestPrintUploadResult(t *testing.T) {
-	t.Run("poll false prints started", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "test"}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
+	tests := []struct {
+		name   string
+		result string
+		poll   bool
+		want   string
+	}{
+		{
+			name:   "poll false prints started with process id",
+			result: "process-123",
+			poll:   false,
+			want:   "Upload started: process-123\n",
+		},
+		{
+			name:   "poll true prints completed with process id",
+			result: "bundle-456",
+			poll:   true,
+			want:   "Upload completed: bundle-456\n",
+		},
+		{
+			name:   "poll false prints unknown when process id is empty",
+			result: "",
+			poll:   false,
+			want:   "Upload started (process ID unknown)\n",
+		},
+		{
+			name:   "poll true prints unknown when process id is empty",
+			result: "",
+			poll:   true,
+			want:   "Upload completed (process ID unknown)\n",
+		},
+		{
+			name:   "poll false trims process id",
+			result: "  process-789  ",
+			poll:   false,
+			want:   "Upload started: process-789\n",
+		},
+		{
+			name:   "poll true treats whitespace-only process id as unknown",
+			result: "   \t   ",
+			poll:   true,
+			want:   "Upload completed (process ID unknown)\n",
+		},
+	}
 
-		printUploadResult(cmd, "process-123", false)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "test"}
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			cmd.SetErr(&out)
 
-		got := out.String()
-		want := "Upload started: process-123\n"
+			printUploadResult(cmd, tt.result, tt.poll)
 
-		if got != want {
-			t.Fatalf("unexpected output: got %q, want %q", got, want)
-		}
-	})
-
-	t.Run("poll true prints completed", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "test"}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		printUploadResult(cmd, "bundle-456", true)
-
-		got := out.String()
-		want := "Upload completed: bundle-456\n"
-
-		if got != want {
-			t.Fatalf("unexpected output: got %q, want %q", got, want)
-		}
-	})
+			if got := out.String(); got != tt.want {
+				t.Fatalf("unexpected output: got %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestRunCommand(t *testing.T) {
@@ -587,11 +614,11 @@ func TestRunCommand_PassesContextToUploader(t *testing.T) {
 			}
 
 			cfg := &global_config.GlobalConfig{
-				Token:     "token",
-				ProjectID: "project-id",
+				Token:          "token",
+				ProjectID:      "project-id",
+				ContextTimeout: tt.timeout,
 			}
 			flags := newFlags()
-			flags.ContextTimeout = tt.timeout
 
 			cmd := newBoundTestCommand(flags)
 			if err := cmd.Flags().Parse([]string{"--filename=en.json", "--lang-iso=en"}); err != nil {

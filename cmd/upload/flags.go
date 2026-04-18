@@ -1,19 +1,16 @@
 package upload
 
 import (
-	"time"
-
 	params "github.com/bodrovis/lokex-cli/internal/params"
 	"github.com/spf13/cobra"
 )
 
 type Flags struct {
-	Filename       string
-	SrcPath        string
-	Data           string
-	LangISO        string
-	Poll           bool
-	ContextTimeout time.Duration
+	Filename string
+	SrcPath  string
+	Data     string
+	LangISO  string
+	Poll     bool
 
 	ConvertPlaceholders                 bool
 	DetectICUPlurals                    bool
@@ -39,9 +36,7 @@ type Flags struct {
 }
 
 func newFlags() *Flags {
-	return &Flags{
-		ContextTimeout: 150 * time.Second,
-	}
+	return &Flags{}
 }
 
 func bindFlags(cmd *cobra.Command, flags *Flags) {

@@ -31,6 +31,7 @@ func TestValidateClientConfig(t *testing.T) {
 				MaxBackoff:      5 * time.Second,
 				PollInitialWait: 1 * time.Second,
 				PollMaxWait:     30 * time.Second,
+				ContextTimeout:  150 * time.Second,
 			},
 		},
 		{
@@ -65,6 +66,31 @@ func TestValidateClientConfig(t *testing.T) {
 			wantErr: "--http-timeout must be >= 0",
 		},
 		{
+			name: "negative context timeout",
+			cfg: GlobalConfig{
+				Token:          "token",
+				ProjectID:      "project-id",
+				ContextTimeout: -1 * time.Second,
+			},
+			wantErr: "--context-timeout must be >= 0",
+		},
+		{
+			name: "zero context timeout is allowed",
+			cfg: GlobalConfig{
+				Token:          "token",
+				ProjectID:      "project-id",
+				ContextTimeout: 0,
+			},
+		},
+		{
+			name: "positive context timeout is allowed",
+			cfg: GlobalConfig{
+				Token:          "token",
+				ProjectID:      "project-id",
+				ContextTimeout: 10 * time.Second,
+			},
+		},
+		{
 			name: "retries less than minus one",
 			cfg: GlobalConfig{
 				Token:      "token",
@@ -72,6 +98,14 @@ func TestValidateClientConfig(t *testing.T) {
 				MaxRetries: -2,
 			},
 			wantErr: "--retries must be >= -1",
+		},
+		{
+			name: "retries minus one is allowed",
+			cfg: GlobalConfig{
+				Token:      "token",
+				ProjectID:  "project-id",
+				MaxRetries: -1,
+			},
 		},
 		{
 			name: "negative initial backoff",
@@ -128,6 +162,24 @@ func TestValidateClientConfig(t *testing.T) {
 				PollMaxWait:     2 * time.Second,
 			},
 			wantErr: "--poll-max-wait must be >= --poll-initial-wait",
+		},
+		{
+			name: "equal backoff bounds are allowed",
+			cfg: GlobalConfig{
+				Token:          "token",
+				ProjectID:      "project-id",
+				InitialBackoff: 2 * time.Second,
+				MaxBackoff:     2 * time.Second,
+			},
+		},
+		{
+			name: "equal poll bounds are allowed",
+			cfg: GlobalConfig{
+				Token:           "token",
+				ProjectID:       "project-id",
+				PollInitialWait: 3 * time.Second,
+				PollMaxWait:     3 * time.Second,
+			},
 		},
 		{
 			name: "zero backoff pair is allowed",

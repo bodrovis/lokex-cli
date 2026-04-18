@@ -30,6 +30,9 @@ func (cfg *GlobalConfig) ValidateClientConfig() error {
 	if cfg.PollMaxWait < 0 {
 		return errors.New("--poll-max-wait must be >= 0")
 	}
+	if cfg.ContextTimeout < 0 {
+		return errors.New("--context-timeout must be >= 0")
+	}
 	if cfg.InitialBackoff > 0 && cfg.MaxBackoff > 0 && cfg.MaxBackoff < cfg.InitialBackoff {
 		return errors.New("--backoff-max must be >= --backoff-initial")
 	}

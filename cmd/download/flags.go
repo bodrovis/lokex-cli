@@ -1,17 +1,14 @@
 package download
 
 import (
-	"time"
-
 	params "github.com/bodrovis/lokex-cli/internal/params"
 	"github.com/spf13/cobra"
 )
 
 type Flags struct {
-	Out            string
-	Format         string
-	ContextTimeout time.Duration
-	Async          bool
+	Out    string
+	Format string
+	Async  bool
 
 	OriginalFilenames          bool
 	BundleStructure            string
@@ -52,12 +49,11 @@ type Flags struct {
 
 func newFlags() *Flags {
 	return &Flags{
-		Out:            "./locales",
-		ContextTimeout: 150 * time.Second,
+		Out: "./locales",
 	}
 }
 
 func bindFlags(cmd *cobra.Command, flags *Flags) {
-	cmd.Flags().SortFlags = false
+	// cmd.Flags().SortFlags = false
 	params.BindFlags(cmd, flags, downloadParamSpecs)
 }

@@ -1,14 +1,9 @@
 package download
 
-import (
-	"time"
-)
-
 type DownloadConfig struct {
-	Out            *string        `mapstructure:"out"`
-	Format         *string        `mapstructure:"format"`
-	ContextTimeout *time.Duration `mapstructure:"context-timeout"`
-	Async          *bool          `mapstructure:"async"`
+	Out    *string `mapstructure:"out"`
+	Format *string `mapstructure:"format"`
+	Async  *bool   `mapstructure:"async"`
 
 	OriginalFilenames          *bool     `mapstructure:"original-filenames"`
 	BundleStructure            *string   `mapstructure:"bundle-structure"`

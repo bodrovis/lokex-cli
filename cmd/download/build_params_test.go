@@ -357,10 +357,9 @@ func TestBuildParams_OmitsLocalOnlyFields(t *testing.T) {
 
 	cmd := newTestCommand()
 	flags := &Flags{
-		Out:            "./x",
-		ContextTimeout: 10,
-		Async:          true,
-		Format:         "json",
+		Out:    "./x",
+		Async:  true,
+		Format: "json",
 	}
 
 	params, err := buildParams(cmd, flags, nil)
@@ -368,7 +367,7 @@ func TestBuildParams_OmitsLocalOnlyFields(t *testing.T) {
 		t.Fatalf("buildParams() error = %v", err)
 	}
 
-	for _, key := range []string{"out", "context_timeout", "async"} {
+	for _, key := range []string{"out", "async"} {
 		if _, ok := params[key]; ok {
 			t.Fatalf("expected %q to be omitted, got %#v", key, params[key])
 		}

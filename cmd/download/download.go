@@ -57,7 +57,7 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 		return err
 	}
 
-	ctx, cancel := newCommandContext(flags.ContextTimeout)
+	ctx, cancel := newCommandContext(cfg.ContextTimeout)
 	defer cancel()
 
 	params, err := buildParams(cmd, flags, defaults)

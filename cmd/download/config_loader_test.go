@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestLoadDownloadConfig_IgnoresMissingImplicitConfig(t *testing.T) {
@@ -47,7 +46,6 @@ func TestLoadDownloadConfig_LoadsValuesFromConfigFile(t *testing.T) {
 download:
   out: ./tmp/out
   format: json
-  context-timeout: 45s
   async: true
   original-filenames: true
   filter-langs:
@@ -74,10 +72,6 @@ download:
 		t.Fatalf("expected Format to be loaded from config, got %#v", cfg.Format)
 	}
 
-	if cfg.ContextTimeout == nil || *cfg.ContextTimeout != 45*time.Second {
-		t.Fatalf("expected ContextTimeout to be 45s, got %#v", cfg.ContextTimeout)
-	}
-
 	if cfg.Async == nil || *cfg.Async != true {
 		t.Fatalf("expected Async to be true, got %#v", cfg.Async)
 	}
@@ -99,7 +93,6 @@ download:
 func TestLoadDownloadConfig_LoadsValuesFromEnv(t *testing.T) {
 	t.Setenv("LOKEX_DOWNLOAD_OUT", "./env-out")
 	t.Setenv("LOKEX_DOWNLOAD_FORMAT", "xml")
-	t.Setenv("LOKEX_DOWNLOAD_CONTEXT_TIMEOUT", "2m")
 	t.Setenv("LOKEX_DOWNLOAD_ASYNC", "true")
 	t.Setenv("LOKEX_DOWNLOAD_ORIGINAL_FILENAMES", "true")
 	t.Setenv("LOKEX_DOWNLOAD_FILTER_LANGS", "de, es")
@@ -118,10 +111,6 @@ func TestLoadDownloadConfig_LoadsValuesFromEnv(t *testing.T) {
 
 	if cfg.Format == nil || *cfg.Format != "xml" {
 		t.Fatalf("expected Format to be loaded from env, got %#v", cfg.Format)
-	}
-
-	if cfg.ContextTimeout == nil || *cfg.ContextTimeout != 2*time.Minute {
-		t.Fatalf("expected ContextTimeout to be 2m, got %#v", cfg.ContextTimeout)
 	}
 
 	if cfg.Async == nil || *cfg.Async != true {

@@ -15,4 +15,5 @@ type GlobalConfigInput struct {
 	MaxBackoff      *time.Duration `mapstructure:"backoff-max"`
 	PollInitialWait *time.Duration `mapstructure:"poll-initial-wait"`
 	PollMaxWait     *time.Duration `mapstructure:"poll-max-wait"`
+	ContextTimeout  *time.Duration `mapstructure:"context-timeout"`
 }

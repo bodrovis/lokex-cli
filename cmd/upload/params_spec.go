@@ -1,8 +1,6 @@
 package upload
 
 import (
-	"time"
-
 	params "github.com/bodrovis/lokex-cli/internal/params"
 	vh "github.com/bodrovis/lokex-cli/internal/viper_helpers"
 
@@ -130,28 +128,6 @@ var uploadParamSpecs = []UploadParamSpec{
 		LoadFromViper: func(v *viper.Viper, cfg *UploadConfig) {
 			vh.ApplyConfigValue(v, "upload.poll", func(val bool) {
 				cfg.Poll = &val
-			})
-		},
-	},
-	{
-		FlagName:  "context-timeout",
-		ConfigKey: "upload.context-timeout",
-		BindFlag: func(cmd *cobra.Command, flags *Flags) {
-			cmd.Flags().DurationVar(
-				&flags.ContextTimeout,
-				"context-timeout",
-				flags.ContextTimeout,
-				"Overall command timeout (e.g. 30s, 2m). 0 disables the timeout",
-			)
-		},
-		ApplyDefault: func(cmd *cobra.Command, flags *Flags, cfg *UploadConfig) {
-			if !cmd.Flags().Changed("context-timeout") && cfg.ContextTimeout != nil {
-				flags.ContextTimeout = *cfg.ContextTimeout
-			}
-		},
-		LoadFromViper: func(v *viper.Viper, cfg *UploadConfig) {
-			vh.ApplyConfigValue(v, "upload.context-timeout", func(val time.Duration) {
-				cfg.ContextTimeout = &val
 			})
 		},
 	},

@@ -1,16 +1,11 @@
 package upload
 
-import (
-	"time"
-)
-
 type UploadConfig struct {
-	Filename       *string        `mapstructure:"filename"`
-	SrcPath        *string        `mapstructure:"src-path"`
-	Data           *string        `mapstructure:"data"`
-	LangISO        *string        `mapstructure:"lang-iso"`
-	Poll           *bool          `mapstructure:"poll"`
-	ContextTimeout *time.Duration `mapstructure:"context-timeout"`
+	Filename *string `mapstructure:"filename"`
+	SrcPath  *string `mapstructure:"src-path"`
+	Data     *string `mapstructure:"data"`
+	LangISO  *string `mapstructure:"lang-iso"`
+	Poll     *bool   `mapstructure:"poll"`
 
 	ConvertPlaceholders                 *bool     `mapstructure:"convert-placeholders"`
 	DetectICUPlurals                    *bool     `mapstructure:"detect-icu-plurals"`

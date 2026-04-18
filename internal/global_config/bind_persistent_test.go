@@ -26,6 +26,7 @@ func TestBindPersistentFlags(t *testing.T) {
 		"--backoff-max=10s",
 		"--poll-initial-wait=2s",
 		"--poll-max-wait=30s",
+		"--context-timeout=100s",
 	}); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
@@ -44,6 +45,9 @@ func TestBindPersistentFlags(t *testing.T) {
 	}
 	if cfg.HTTPTimeout != 45*time.Second {
 		t.Fatalf("unexpected http timeout: %v", cfg.HTTPTimeout)
+	}
+	if cfg.ContextTimeout != 100*time.Second {
+		t.Fatalf("unexpected context timeout: %v", cfg.ContextTimeout)
 	}
 	if cfg.MaxRetries != 5 {
 		t.Fatalf("unexpected retries: %d", cfg.MaxRetries)
@@ -88,6 +92,9 @@ func TestBindPersistentFlags_Defaults(t *testing.T) {
 	}
 	if cfg.HTTPTimeout != 0 {
 		t.Fatalf("expected zero http timeout, got %v", cfg.HTTPTimeout)
+	}
+	if cfg.ContextTimeout != 150*time.Second {
+		t.Fatalf("expected 150s context timeout, got %v", cfg.ContextTimeout)
 	}
 	if cfg.MaxRetries != -1 {
 		t.Fatalf("expected default retries -1, got %d", cfg.MaxRetries)

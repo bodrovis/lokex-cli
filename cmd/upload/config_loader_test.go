@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestLoadUploadConfig_IgnoresMissingImplicitConfig(t *testing.T) {
@@ -49,7 +48,6 @@ upload:
   src-path: ./locales/messages.json
   lang-iso: en
   poll: true
-  context-timeout: 45s
   format: json
   tags:
     - mobile
@@ -82,10 +80,6 @@ upload:
 
 	if cfg.Poll == nil || *cfg.Poll != true {
 		t.Fatalf("expected Poll to be true, got %#v", cfg.Poll)
-	}
-
-	if cfg.ContextTimeout == nil || *cfg.ContextTimeout != 45*time.Second {
-		t.Fatalf("expected ContextTimeout to be 45s, got %#v", cfg.ContextTimeout)
 	}
 
 	if cfg.Format == nil || *cfg.Format != "json" {
@@ -138,10 +132,6 @@ func TestLoadUploadConfig_LoadsValuesFromEnv(t *testing.T) {
 
 	if cfg.Poll == nil || *cfg.Poll != true {
 		t.Fatalf("expected Poll to be true, got %#v", cfg.Poll)
-	}
-
-	if cfg.ContextTimeout == nil || *cfg.ContextTimeout != 2*time.Minute {
-		t.Fatalf("expected ContextTimeout to be 2m, got %#v", cfg.ContextTimeout)
 	}
 
 	if cfg.Format == nil || *cfg.Format != "xml" {

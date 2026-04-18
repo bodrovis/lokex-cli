@@ -60,7 +60,7 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 		return err
 	}
 
-	ctx, cancel := newCommandContext(flags.ContextTimeout)
+	ctx, cancel := newCommandContext(cfg.ContextTimeout)
 	defer cancel()
 
 	params, err := buildParams(cmd, flags, defaults)
@@ -105,6 +105,17 @@ func performUpload(
 }
 
 func printUploadResult(cmd *cobra.Command, result string, poll bool) {
+	result = strings.TrimSpace(result)
+
+	if result == "" {
+		if poll {
+			cmd.Println("Upload completed (process ID unknown)")
+			return
+		}
+		cmd.Println("Upload started (process ID unknown)")
+		return
+	}
+
 	if poll {
 		cmd.Printf("Upload completed: %s\n", result)
 		return

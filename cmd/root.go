@@ -12,7 +12,23 @@ import (
 
 var version = "dev"
 
+type loadGlobalConfigInputFunc func(string, global_config.LoadOptions) (*global_config.GlobalConfigInput, error)
+type loadUploadConfigFunc func(*uploadcmd.UploadConfig, string, string) error
+type loadDownloadConfigFunc func(*downloadcmd.DownloadConfig, string, string) error
+
 func RootCmd() *cobra.Command {
+	return newRootCmd(
+		global_config.LoadGlobalConfigInput,
+		uploadcmd.LoadUploadConfig,
+		downloadcmd.LoadDownloadConfig,
+	)
+}
+
+func newRootCmd(
+	loadGlobal loadGlobalConfigInputFunc,
+	loadUpload loadUploadConfigFunc,
+	loadDownload loadDownloadConfigFunc,
+) *cobra.Command {
 	cfg := &global_config.GlobalConfig{
 		UserAgent: fmt.Sprintf("lokex-cli/%s", version),
 	}
@@ -34,32 +50,15 @@ This tool is optimized for import/export workflows and direct access to file-rel
 `,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			loadOpts := global_config.LoadOptions{
-				ConfigFile: configFile,
-				EnvPrefix:  "LOKEX",
-			}
-
-			globalInput, err := global_config.LoadGlobalConfigInput(cfg.UserAgent, loadOpts)
-			if err != nil {
-				return err
-			}
-
-			global_config.ApplyGlobalDefaults(cmd, cfg, globalInput)
-
-			switch cmd.Name() {
-			case "upload":
-				if err := uploadcmd.LoadUploadConfig(uploadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
-					return err
-				}
-			case "download":
-				if err := downloadcmd.LoadDownloadConfig(downloadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		},
+		PersistentPreRunE: newPersistentPreRunE(
+			cfg,
+			uploadCfg,
+			downloadCfg,
+			&configFile,
+			loadGlobal,
+			loadUpload,
+			loadDownload,
+		),
 	}
 
 	global_config.BindPersistentFlags(cmd.PersistentFlags(), cfg)
@@ -71,4 +70,41 @@ This tool is optimized for import/export workflows and direct access to file-rel
 	cmd.AddCommand(uploadcmd.NewCommand(cfg, uploadCfg))
 
 	return cmd
+}
+
+func newPersistentPreRunE(
+	cfg *global_config.GlobalConfig,
+	uploadCfg *uploadcmd.UploadConfig,
+	downloadCfg *downloadcmd.DownloadConfig,
+	configFile *string,
+	loadGlobal loadGlobalConfigInputFunc,
+	loadUpload loadUploadConfigFunc,
+	loadDownload loadDownloadConfigFunc,
+) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		loadOpts := global_config.LoadOptions{
+			ConfigFile: *configFile,
+			EnvPrefix:  "LOKEX",
+		}
+
+		globalInput, err := loadGlobal(cfg.UserAgent, loadOpts)
+		if err != nil {
+			return err
+		}
+
+		global_config.ApplyGlobalDefaults(cmd, cfg, globalInput)
+
+		switch cmd.Name() {
+		case "upload":
+			if err := loadUpload(uploadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
+				return err
+			}
+		case "download":
+			if err := loadDownload(downloadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
 }

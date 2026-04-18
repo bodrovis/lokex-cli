@@ -21,6 +21,7 @@ See each sub-command's help for details on how to use the generated script.
       --backoff-max duration         Maximum retry backoff (e.g. 5s, 10s). 0 means library default
       --base-url string              Override Lokalise API base URL
       --config string                Path to YAML config file
+      --context-timeout duration     Overall command timeout (e.g. 30s, 2m). 0 disables the timeout (default 2m30s)
       --http-timeout duration        HTTP client timeout (e.g. 30s, 1m). 0 means library default
       --poll-initial-wait duration   Initial wait between polling rounds (e.g. 1s, 2s). 0 means library default
       --poll-max-wait duration       Maximum total wait for polling (e.g. 120s, 5m). 0 means library default
