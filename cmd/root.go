@@ -7,9 +7,7 @@ import (
 
 	downloadcmd "github.com/bodrovis/lokex-cli/cmd/download"
 	uploadcmd "github.com/bodrovis/lokex-cli/cmd/upload"
-	"github.com/bodrovis/lokex-cli/internal/download_config"
 	"github.com/bodrovis/lokex-cli/internal/global_config"
-	"github.com/bodrovis/lokex-cli/internal/upload_config"
 )
 
 var version = "dev"
@@ -18,8 +16,8 @@ func RootCmd() *cobra.Command {
 	cfg := &global_config.GlobalConfig{
 		UserAgent: fmt.Sprintf("lokex-cli/%s", version),
 	}
-	uploadCfg := &upload_config.UploadConfig{}
-	downloadCfg := &download_config.DownloadConfig{}
+	uploadCfg := &uploadcmd.UploadConfig{}
+	downloadCfg := &downloadcmd.DownloadConfig{}
 
 	var configFile string
 
@@ -51,11 +49,11 @@ This tool is optimized for import/export workflows and direct access to file-rel
 
 			switch cmd.Name() {
 			case "upload":
-				if err := upload_config.LoadUploadConfig(uploadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
+				if err := uploadcmd.LoadUploadConfig(uploadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
 					return err
 				}
 			case "download":
-				if err := download_config.LoadDownloadConfig(downloadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
+				if err := downloadcmd.LoadDownloadConfig(downloadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
 					return err
 				}
 			}

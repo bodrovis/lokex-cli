@@ -1,4 +1,4 @@
-package download_config
+package download
 
 import (
 	"time"

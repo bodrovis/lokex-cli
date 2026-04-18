@@ -17,7 +17,10 @@ func TestBuildParams_Minimal(t *testing.T) {
 		LangISO:  "en",
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	if got := params["filename"]; got != "en.json" {
 		t.Fatalf("unexpected filename: got %v, want %q", got, "en.json")
@@ -42,7 +45,10 @@ func TestBuildParams_NormalizesFilenamePath(t *testing.T) {
 		LangISO:  "en",
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	if got := params["filename"]; got != "admin/main.json" {
 		t.Fatalf("unexpected filename: got %v, want %q", got, "admin/main.json")
@@ -61,7 +67,10 @@ func TestBuildParams_SetsTrimmedStringFields(t *testing.T) {
 		Format:   " json ",
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	if got := params["data"]; got != "ZGF0YQ==" {
 		t.Fatalf("unexpected data: got %v, want %q", got, "ZGF0YQ==")
@@ -84,7 +93,10 @@ func TestBuildParams_SetsFilteredStringSliceFields(t *testing.T) {
 		CustomTranslationStatusIDs: []string{"1", "", "2"},
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	gotTags, ok := params["tags"]
 	if !ok {
@@ -121,7 +133,10 @@ func TestBuildParams_OmitsEmptyOptionalFields(t *testing.T) {
 		CustomTranslationStatusIDs: nil,
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	if _, ok := params["data"]; ok {
 		t.Fatalf("expected data to be omitted, got %#v", params["data"])
@@ -151,7 +166,10 @@ func TestBuildParams_SetsBoolOnlyWhenFlagChanged(t *testing.T) {
 			ConvertPlaceholders: true,
 		}
 
-		params := buildParams(cmd, flags, nil)
+		params, err := buildParams(cmd, flags, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for buildParams: %v", err)
+		}
 
 		if _, ok := params["convert_placeholders"]; ok {
 			t.Fatalf("expected convert_placeholders to be omitted, got %#v", params["convert_placeholders"])
@@ -172,7 +190,10 @@ func TestBuildParams_SetsBoolOnlyWhenFlagChanged(t *testing.T) {
 			ConvertPlaceholders: true,
 		}
 
-		params := buildParams(cmd, flags, nil)
+		params, err := buildParams(cmd, flags, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for buildParams: %v", err)
+		}
 
 		got, ok := params["convert_placeholders"]
 		if !ok {
@@ -197,7 +218,10 @@ func TestBuildParams_SetsBoolOnlyWhenFlagChanged(t *testing.T) {
 			ConvertPlaceholders: false,
 		}
 
-		params := buildParams(cmd, flags, nil)
+		params, err := buildParams(cmd, flags, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for buildParams: %v", err)
+		}
 
 		got, ok := params["convert_placeholders"]
 		if !ok {
@@ -223,7 +247,10 @@ func TestBuildParams_FilterTaskID(t *testing.T) {
 			FilterTaskID: 42,
 		}
 
-		params := buildParams(cmd, flags, nil)
+		params, err := buildParams(cmd, flags, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for buildParams: %v", err)
+		}
 
 		if _, ok := params["filter_task_id"]; ok {
 			t.Fatalf("expected filter_task_id to be omitted, got %#v", params["filter_task_id"])
@@ -244,7 +271,10 @@ func TestBuildParams_FilterTaskID(t *testing.T) {
 			FilterTaskID: 42,
 		}
 
-		params := buildParams(cmd, flags, nil)
+		params, err := buildParams(cmd, flags, nil)
+		if err != nil {
+			t.Fatalf("unexpected error for buildParams: %v", err)
+		}
 
 		got, ok := params["filter_task_id"]
 		if !ok {
@@ -276,7 +306,10 @@ func TestBuildParams_SetsMultipleBoolFields(t *testing.T) {
 		HiddenFromContributors: false,
 	}
 
-	params := buildParams(cmd, flags, nil)
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
 
 	if got := params["apply_tm"]; got != true {
 		t.Fatalf("unexpected apply_tm: got %#v, want true", got)
@@ -285,6 +318,165 @@ func TestBuildParams_SetsMultipleBoolFields(t *testing.T) {
 		t.Fatalf("unexpected use_automations: got %#v, want true", got)
 	}
 	if got := params["hidden_from_contributors"]; got != false {
+		t.Fatalf("unexpected hidden_from_contributors: got %#v, want false", got)
+	}
+}
+
+func TestBuildParams_OmitsLocalOnlyFields(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+
+	flags := &Flags{
+		Filename:       "en.json",
+		LangISO:        "en",
+		SrcPath:        "./local/en.json",
+		Poll:           true,
+		ContextTimeout: 30,
+	}
+
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	for _, key := range []string{"src_path", "poll", "context_timeout"} {
+		if _, ok := params[key]; ok {
+			t.Fatalf("expected %q to be omitted, got %#v", key, params[key])
+		}
+	}
+}
+
+func TestBuildParams_TrimsRequiredFields(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+
+	flags := &Flags{
+		Filename: "  admin\\main.json  ",
+		LangISO:  "  en  ",
+	}
+
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	if got := params["filename"]; got != "admin/main.json" {
+		t.Fatalf("unexpected filename: got %v, want %q", got, "admin/main.json")
+	}
+	if got := params["lang_iso"]; got != "en" {
+		t.Fatalf("unexpected lang_iso: got %v, want %q", got, "en")
+	}
+}
+func TestBuildParams_UsesBoolDefaultFromConfig(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+
+	flags := &Flags{
+		Filename: "en.json",
+		LangISO:  "en",
+	}
+	defaults := &UploadConfig{
+		ApplyTM: new(true),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	got, ok := params["apply_tm"]
+	if !ok {
+		t.Fatal("expected apply_tm to be set from defaults")
+	}
+	if got != true {
+		t.Fatalf("unexpected apply_tm: got %#v, want true", got)
+	}
+}
+
+func TestBuildParams_UsesInt64DefaultFromConfig(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+
+	flags := &Flags{
+		Filename: "en.json",
+		LangISO:  "en",
+	}
+	defaults := &UploadConfig{
+		FilterTaskID: new(int64(42)),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	got, ok := params["filter_task_id"]
+	if !ok {
+		t.Fatal("expected filter_task_id to be set from defaults")
+	}
+	if got != int64(42) {
+		t.Fatalf("unexpected filter_task_id: got %#v, want %d", got, int64(42))
+	}
+}
+
+func TestBuildParams_ExplicitFlagOverridesBoolDefault(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	if err := cmd.Flags().Parse([]string{"--apply-tm=false"}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+
+	flags := &Flags{
+		Filename: "en.json",
+		LangISO:  "en",
+		ApplyTM:  false,
+	}
+	defaults := &UploadConfig{
+		ApplyTM: new(true),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	got, ok := params["apply_tm"]
+	if !ok {
+		t.Fatal("expected apply_tm to be set")
+	}
+	if got != false {
+		t.Fatalf("unexpected apply_tm: got %#v, want false", got)
+	}
+}
+
+func TestBuildParams_UsesFalseBoolDefaultFromConfig(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+
+	flags := &Flags{
+		Filename: "en.json",
+		LangISO:  "en",
+	}
+	defaults := &UploadConfig{
+		HiddenFromContributors: new(false),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("unexpected error for buildParams: %v", err)
+	}
+
+	got, ok := params["hidden_from_contributors"]
+	if !ok {
+		t.Fatal("expected hidden_from_contributors to be set from defaults")
+	}
+	if got != false {
 		t.Fatalf("unexpected hidden_from_contributors: got %#v, want false", got)
 	}
 }

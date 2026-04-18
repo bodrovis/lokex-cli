@@ -219,6 +219,85 @@ lokex-cli download \
 --language-mapping "[{\"lang_iso\":\"en\",\"custom_iso\":\"en_US\"}]"
 ```
 
+## Configuration via environment variables and YAML
+
+In addition to CLI flags, `lokex-cli` can also read command defaults from:
+
+- environment variables
+- an optional YAML config file
+
+### YAML file
+
+Config file can be provided explicitly:
+
+```
+lokex-cli --config path/to/config.yaml <command>
+```
+
+If `--config` is not set, `lokex-cli` will try to automatically find a config file named `lokex.yaml` in the following locations:
+
+- current working directory (`./lokex.yaml`)
+- user config directory: `~/.config/lokex-cli/lokex.yaml`
+
+If no config file is found, execution continues without error.
+
+Command-specific options must be placed under the matching namespace:
+
+- `download.*` for `lokex-cli download`
+- `upload.*` for `lokex-cli upload`
+
+Example:
+
+```yaml
+token: token
+project-id: project-id
+
+download:
+  format: json
+  out: ./tmp/locales
+  async: true
+  filter-langs:
+    - en
+    - fr
+  include-tags:
+    - mobile
+    - release
+
+upload:
+  filename: en.json
+  src-path: ./locales/en.json
+  lang-iso: en
+  poll: true
+  replace-modified: true
+  tags:
+    - backend
+    - release
+```
+
+### Environment variables
+
+Environment variables follow the same logical keys as the YAML config, using the `LOKEX` env prefix.
+
+```
+LOKEX_TOKEN=token
+LOKEX_PROJECT_ID=project-id
+LOKEX_DOWNLOAD_FORMAT=json
+LOKEX_DOWNLOAD_OUT=./locales
+LOKEX_UPLOAD_FILENAME=en.json
+LOKEX_UPLOAD_LANG_ISO=en
+LOKEX_UPLOAD_POLL=true
+```
+
+### Precedence
+
+If you pass a value explicitly as a CLI flag, it overrides the value from YAML or environment variables.
+
+So the effective order is:
+
+- explicit CLI flag
+- environment variable / YAML config
+- built-in default
+
 ## Testing
 
 Run:

@@ -2,6 +2,7 @@ package download
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -349,4 +350,167 @@ func newBoolDefaultTrueCommand() *cobra.Command {
 	cmd.Flags().Int("filter-task-id", 0, "")
 
 	return cmd
+}
+
+func TestBuildParams_OmitsLocalOnlyFields(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Out:            "./x",
+		ContextTimeout: 10,
+		Async:          true,
+		Format:         "json",
+	}
+
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	for _, key := range []string{"out", "context_timeout", "async"} {
+		if _, ok := params[key]; ok {
+			t.Fatalf("expected %q to be omitted, got %#v", key, params[key])
+		}
+	}
+}
+
+func TestBuildParams_OmitsWhitespaceOnlyStringFields(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Format:          "json",
+		BundleStructure: "   ",
+		WebhookURL:      "\t",
+	}
+
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	if _, ok := params["bundle_structure"]; ok {
+		t.Fatalf("expected bundle_structure to be omitted")
+	}
+	if _, ok := params["webhook_url"]; ok {
+		t.Fatalf("expected webhook_url to be omitted")
+	}
+}
+
+func TestBuildParams_UsesBoolDefaultFromConfig(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Format: "json",
+	}
+	defaults := &DownloadConfig{
+		Compact: new(true),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	got, ok := params["compact"]
+	if !ok {
+		t.Fatal("expected compact to be set from defaults")
+	}
+	if got != true {
+		t.Fatalf("expected compact=true, got %#v", got)
+	}
+}
+
+func TestBuildParams_UsesInt64DefaultFromConfig(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Format: "json",
+	}
+	defaults := &DownloadConfig{
+		FilterTaskID: new(int64(123)),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	got, ok := params["filter_task_id"]
+	if !ok {
+		t.Fatal("expected filter_task_id to be set from defaults")
+	}
+	if got != int64(123) {
+		t.Fatalf("expected 123, got %#v", got)
+	}
+}
+
+func TestBuildParams_ExplicitFlagOverridesDefault(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	if err := cmd.Flags().Set("compact", "false"); err != nil {
+		t.Fatalf("set compact: %v", err)
+	}
+
+	flags := &Flags{
+		Format:  "json",
+		Compact: false,
+	}
+	defaults := &DownloadConfig{
+		Compact: new(true),
+	}
+
+	params, err := buildParams(cmd, flags, defaults)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	got, ok := params["compact"]
+	if !ok {
+		t.Fatal("expected compact to be set")
+	}
+	if got != false {
+		t.Fatalf("expected compact=false, got %#v", got)
+	}
+}
+
+func TestBuildParams_OmitsLanguageMappingWhenBlank(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Format:              "json",
+		LanguageMappingJSON: "   ",
+	}
+
+	params, err := buildParams(cmd, flags, nil)
+	if err != nil {
+		t.Fatalf("buildParams() error = %v", err)
+	}
+
+	if _, ok := params["language_mapping"]; ok {
+		t.Fatalf("expected language_mapping to be omitted")
+	}
+}
+
+func TestBuildParams_LanguageMappingErrorContainsFlagName(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	flags := &Flags{
+		Format:              "json",
+		LanguageMappingJSON: `not-json`,
+	}
+
+	_, err := buildParams(cmd, flags, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "parse --language-mapping") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

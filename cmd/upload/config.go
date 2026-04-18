@@ -1,4 +1,4 @@
-package upload_config
+package upload
 
 import (
 	"time"

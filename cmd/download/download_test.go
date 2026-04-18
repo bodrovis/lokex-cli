@@ -550,6 +550,212 @@ func TestRunCommand(t *testing.T) {
 	})
 }
 
+func TestNewCommand_PreRunE_UsesDefaults(t *testing.T) {
+	t.Parallel()
+
+	cfg := &globalCfg.GlobalConfig{
+		Token:     "token",
+		ProjectID: "project-id",
+	}
+	defaults := &DownloadConfig{
+		Format: new("json"),
+	}
+
+	cmd := NewCommand(cfg, defaults)
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+
+	if err := cmd.PreRunE(cmd, nil); err != nil {
+		t.Fatalf("PreRunE() error = %v", err)
+	}
+
+	got, err := cmd.Flags().GetString("format")
+	if err != nil {
+		t.Fatalf("GetString(format): %v", err)
+	}
+	if got != "json" {
+		t.Fatalf("expected format from defaults to be %q, got %q", "json", got)
+	}
+}
+
+func TestNewCommand_PreRunE_ExplicitFlagOverridesDefaults(t *testing.T) {
+	t.Parallel()
+
+	cfg := &globalCfg.GlobalConfig{
+		Token:     "token",
+		ProjectID: "project-id",
+	}
+	defaults := &DownloadConfig{
+		Format: new("json"),
+	}
+
+	cmd := NewCommand(cfg, defaults)
+	if err := cmd.ParseFlags([]string{"--format=xml"}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+
+	if err := cmd.PreRunE(cmd, nil); err != nil {
+		t.Fatalf("PreRunE() error = %v", err)
+	}
+
+	got, err := cmd.Flags().GetString("format")
+	if err != nil {
+		t.Fatalf("GetString(format): %v", err)
+	}
+	if got != "xml" {
+		t.Fatalf("expected explicit flag to win, got %q", got)
+	}
+}
+
+func TestRunCommand_PassesContextToDownloader(t *testing.T) {
+	tests := []struct {
+		name         string
+		timeout      time.Duration
+		wantDeadline bool
+	}{
+		{
+			name:         "positive timeout adds deadline",
+			timeout:      2 * time.Second,
+			wantDeadline: true,
+		},
+		{
+			name:         "zero timeout uses background context",
+			timeout:      0,
+			wantDeadline: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := newDownloaderFunc
+			t.Cleanup(func() {
+				newDownloaderFunc = old
+			})
+
+			md := &mockDownloader{
+				downloadURL: "https://example.com/file.zip",
+			}
+			newDownloaderFunc = func(cfg *globalCfg.GlobalConfig) (downloader, error) {
+				return md, nil
+			}
+
+			cfg := &globalCfg.GlobalConfig{
+				Token:     "token",
+				ProjectID: "project-id",
+			}
+			flags := newFlags()
+			flags.Format = "json"
+			flags.ContextTimeout = tt.timeout
+
+			cmd := newBoundTestCommand(flags)
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			cmd.SetErr(&out)
+
+			if err := runCommand(cmd, cfg, flags, nil); err != nil {
+				t.Fatalf("runCommand() error = %v", err)
+			}
+
+			if md.gotCtx == nil {
+				t.Fatal("expected context to be passed to downloader")
+			}
+
+			_, gotDeadline := md.gotCtx.Deadline()
+			if gotDeadline != tt.wantDeadline {
+				t.Fatalf("unexpected deadline presence: got %v, want %v", gotDeadline, tt.wantDeadline)
+			}
+		})
+	}
+}
+
+func TestRunCommand_UsesDefaultsInBuildParams(t *testing.T) {
+	old := newDownloaderFunc
+	t.Cleanup(func() {
+		newDownloaderFunc = old
+	})
+
+	md := &mockDownloader{
+		downloadURL: "https://example.com/file.zip",
+	}
+	newDownloaderFunc = func(cfg *globalCfg.GlobalConfig) (downloader, error) {
+		return md, nil
+	}
+
+	cfg := &globalCfg.GlobalConfig{
+		Token:     "token",
+		ProjectID: "project-id",
+	}
+	flags := newFlags()
+	flags.Format = "json"
+
+	defaults := &DownloadConfig{
+		Compact: new(true),
+	}
+
+	cmd := newBoundTestCommand(flags)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+
+	if err := runCommand(cmd, cfg, flags, defaults); err != nil {
+		t.Fatalf("runCommand() error = %v", err)
+	}
+
+	got, ok := md.gotParams["compact"]
+	if !ok {
+		t.Fatal("expected compact to be set from defaults")
+	}
+	if got != true {
+		t.Fatalf("expected compact=true, got %#v", got)
+	}
+}
+
+func TestRunCommand_AsyncDownloadError(t *testing.T) {
+	old := newDownloaderFunc
+	t.Cleanup(func() {
+		newDownloaderFunc = old
+	})
+
+	md := &mockDownloader{
+		downloadAsyncErr: errors.New("async download failed"),
+	}
+	newDownloaderFunc = func(cfg *globalCfg.GlobalConfig) (downloader, error) {
+		return md, nil
+	}
+
+	cfg := &globalCfg.GlobalConfig{
+		Token:     "token",
+		ProjectID: "project-id",
+	}
+	flags := newFlags()
+	flags.Format = "json"
+	flags.Async = true
+
+	cmd := newBoundTestCommand(flags)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+
+	err := runCommand(cmd, cfg, flags, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "async download failed" {
+		t.Fatalf("unexpected error: %q", err.Error())
+	}
+
+	if !md.downloadAsyncCalled {
+		t.Fatal("expected DownloadAsync to be called")
+	}
+	if md.downloadCalled {
+		t.Fatal("did not expect Download to be called")
+	}
+	if strings.Contains(out.String(), "Bundle downloaded from:") {
+		t.Fatalf("did not expect success output on error, got %q", out.String())
+	}
+}
+
 func newBoundTestCommand(flags *Flags) *cobra.Command {
 	cmd := &cobra.Command{Use: "test"}
 	bindFlags(cmd, flags)

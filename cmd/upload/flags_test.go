@@ -238,3 +238,100 @@ func TestBindFlags_BoolCanBeExplicitlySetFalse(t *testing.T) {
 		t.Fatal("expected hidden-from-contributors to be marked as changed")
 	}
 }
+
+func TestBindFlags_MarksRepresentativeFlagsAsChanged(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cobra.Command{Use: "test"}
+	flags := newFlags()
+
+	bindFlags(cmd, flags)
+
+	if err := cmd.Flags().Parse([]string{
+		"--filename=en.json",
+		"--tags=mobile,web",
+		"--filter-task-id=123",
+	}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+
+	for _, name := range []string{"filename", "tags", "filter-task-id"} {
+		if !cmd.Flags().Changed(name) {
+			t.Fatalf("expected flag %q to be marked as changed", name)
+		}
+	}
+}
+
+func TestBindFlags_BindsInt64ValueBeyondInt32Range(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cobra.Command{Use: "test"}
+	flags := newFlags()
+
+	bindFlags(cmd, flags)
+
+	const want int64 = 5000000000
+
+	if err := cmd.Flags().Parse([]string{"--filter-task-id=5000000000"}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+
+	if flags.FilterTaskID != want {
+		t.Fatalf("unexpected FilterTaskID: got %d, want %d", flags.FilterTaskID, want)
+	}
+
+	if !cmd.Flags().Changed("filter-task-id") {
+		t.Fatal("expected filter-task-id to be marked as changed")
+	}
+}
+
+func TestBindFlags_BindsEverySpecFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cobra.Command{Use: "test"}
+	flags := newFlags()
+
+	bindFlags(cmd, flags)
+
+	for _, spec := range uploadParamSpecs {
+		if spec.FlagName == "" {
+			t.Fatal("encountered spec with empty FlagName")
+		}
+
+		flag := cmd.Flags().Lookup(spec.FlagName)
+		if flag == nil {
+			t.Fatalf("expected flag %q to be bound from spec", spec.FlagName)
+		}
+	}
+}
+
+func TestBindFlags_RepresentativeFlagDefaultsMatchCurrentFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := &cobra.Command{Use: "test"}
+	flags := newFlags()
+
+	bindFlags(cmd, flags)
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "context-timeout", want: "2m30s"},
+		{name: "filename", want: ""},
+		{name: "src-path", want: ""},
+		{name: "lang-iso", want: ""},
+		{name: "format", want: ""},
+		{name: "filter-task-id", want: "0"},
+	}
+
+	for _, tt := range tests {
+		flag := cmd.Flags().Lookup(tt.name)
+		if flag == nil {
+			t.Fatalf("expected flag %q to exist", tt.name)
+		}
+		if flag.DefValue != tt.want {
+			t.Fatalf("unexpected default for %q: got %q, want %q", tt.name, flag.DefValue, tt.want)
+		}
+	}
+}

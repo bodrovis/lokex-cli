@@ -10,9 +10,9 @@ lokex-cli download [flags]
 
 ```
       --out string                              Directory to unzip downloaded bundle into (default "./locales")
-      --async                                   Use Lokalise async download flow
-      --context-timeout duration                Overall command timeout (e.g. 30s, 2m). 0 disables the timeout (default 2m30s)
       --format string                           File format (e.g. json, strings, xml)
+      --context-timeout duration                Overall command timeout (e.g. 30s, 2m). 0 disables the timeout (default 2m30s)
+      --async                                   Use Lokalise async download flow
       --original-filenames                      Use original filenames/formats
       --bundle-structure string                 Bundle structure when original-filenames=false
       --directory-prefix string                 Directory prefix in bundle when original-filenames=true
@@ -24,30 +24,30 @@ lokex-cli download [flags]
       --include-tags strings                    Only include keys with these tags
       --exclude-tags strings                    Exclude keys with these tags
       --include-pids strings                    Include keys from other project IDs
+      --triggers strings                        Trigger integration exports
       --filter-repositories strings             Only process selected repositories in organization/repository format
       --filter-task-id int                      Only include keys attributed to this task (offline_xliff only)
+      --add-newline-eof                         Add newline at end of file when supported
       --include-comments                        Include key comments and description when supported
       --include-description                     Include key description when supported
-      --add-newline-eof                         Add newline at end of file when supported
+      --replace-breaks                          Replace line breaks in exported translations with \n
+      --disable-references                      Disable automatic replacement of key reference placeholders
+      --icu-numeric                             Replace ICU plural forms zero/one/two with =0/=1/=2
+      --escape-percent                          Escape universal percent placeholders for printf format
+      --yaml-include-root                       Include language ISO code as root key for YAML export
+      --json-unescaped-slashes                  Leave forward slashes unescaped in JSON export
+      --compact                                 Export compact ARB structure
       --export-sort string                      Export key sort mode
       --export-empty-as string                  How to export empty translations
       --export-null-as string                   How to export null translations (Ruby on Rails YAML only)
-      --replace-breaks                          Replace line breaks in exported translations with \n
-      --disable-references                      Disable automatic replacement of key reference placeholders
       --plural-format string                    Override default plural format
       --placeholder-format string               Override default placeholder format
-      --icu-numeric                             Replace ICU plural forms zero/one/two with =0/=1/=2
-      --escape-percent                          Escape universal percent placeholders for printf format
+      --webhook-url string                      Send POST with generated bundle URL to this URL when export completes
       --indentation string                      Override indentation in supported files
-      --yaml-include-root                       Include language ISO code as root key for YAML export
-      --json-unescaped-slashes                  Leave forward slashes unescaped in JSON export
       --java-properties-encoding string         Encoding for Java .properties export
       --java-properties-separator string        Separator for Java .properties export
-      --compact                                 Export compact ARB structure
-      --triggers strings                        Trigger integration exports
-      --webhook-url string                      Send POST with generated bundle URL to this URL when export completes
-      --language-mapping string                 Language mapping as JSON array of objects
       --bundle-description string               Description for ios_sdk/android_sdk OTA SDK bundles
+      --language-mapping string                 Language mapping as JSON array of objects
   -h, --help                                    help for download
 ```
 
@@ -57,6 +57,7 @@ lokex-cli download [flags]
       --backoff-initial duration     Initial retry backoff (e.g. 400ms, 1s). 0 means library default
       --backoff-max duration         Maximum retry backoff (e.g. 5s, 10s). 0 means library default
       --base-url string              Override Lokalise API base URL
+      --config string                Path to YAML config file
       --http-timeout duration        HTTP client timeout (e.g. 30s, 1m). 0 means library default
       --poll-initial-wait duration   Initial wait between polling rounds (e.g. 1s, 2s). 0 means library default
       --poll-max-wait duration       Maximum total wait for polling (e.g. 120s, 5m). 0 means library default
@@ -70,4 +71,4 @@ lokex-cli download [flags]
 
 * [lokex-cli](lokex-cli.md)	 - CLI for uploading and downloading files with Lokalise
 
-###### Auto generated by spf13/cobra on 16-Apr-2026
+###### Auto generated by spf13/cobra on 18-Apr-2026

@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	downloadCfg "github.com/bodrovis/lokex-cli/internal/download_config"
 	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
 )
@@ -20,7 +19,7 @@ type downloader interface {
 
 var newDownloaderFunc = newDownloader
 
-func NewCommand(cfg *globalCfg.GlobalConfig, defaults *downloadCfg.DownloadConfig) *cobra.Command {
+func NewCommand(cfg *globalCfg.GlobalConfig, defaults *DownloadConfig) *cobra.Command {
 	flags := newFlags()
 
 	cmd := &cobra.Command{
@@ -52,7 +51,7 @@ func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
 	return nil
 }
 
-func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, defaults *downloadCfg.DownloadConfig) error {
+func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, defaults *DownloadConfig) error {
 	dl, err := newDownloaderFunc(cfg)
 	if err != nil {
 		return err
