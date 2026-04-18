@@ -369,6 +369,7 @@ func TestBuildParams_TrimsRequiredFields(t *testing.T) {
 		t.Fatalf("unexpected lang_iso: got %v, want %q", got, "en")
 	}
 }
+
 func TestBuildParams_UsesBoolDefaultFromConfig(t *testing.T) {
 	t.Parallel()
 

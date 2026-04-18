@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var userHomeDir = os.UserHomeDir
+
 func NewConfigViper(configFile, envPrefix string) *viper.Viper {
 	v := viper.New()
 
@@ -16,7 +18,7 @@ func NewConfigViper(configFile, envPrefix string) *viper.Viper {
 		v.SetConfigName("lokex")
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
-		if home, err := os.UserHomeDir(); err == nil {
+		if home, err := userHomeDir(); err == nil {
 			v.AddConfigPath(home + "/.config/lokex-cli")
 		}
 	}
