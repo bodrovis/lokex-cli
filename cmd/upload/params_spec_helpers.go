@@ -1,7 +1,6 @@
 package upload
 
 import (
-	"path/filepath"
 	"strings"
 
 	setters "github.com/bodrovis/lokex-cli/internal/params"
@@ -36,8 +35,9 @@ func reqNormalizedFilename(
 	get func(*Flags) string,
 ) func(*cobra.Command, *Flags, *UploadConfig, lokexupload.UploadParams) error {
 	return func(_ *cobra.Command, flags *Flags, _ *UploadConfig, req lokexupload.UploadParams) error {
-		req[apiKey] = filepath.ToSlash(strings.TrimSpace(get(flags)))
-
+		val := strings.TrimSpace(get(flags))
+		val = strings.ReplaceAll(val, `\`, `/`)
+		req[apiKey] = val
 		return nil
 	}
 }
