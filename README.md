@@ -1,5 +1,10 @@
 # Lokex CLI: Content exchange tool for Lokalise
 
+![GitHub Release](https://img.shields.io/github/v/release/bodrovis/lokex-cli)
+![CI](https://github.com/bodrovis/lokex-cli/actions/workflows/ci.yml/badge.svg)
+[![Code Coverage](https://qlty.sh/gh/bodrovis/projects/lokex-cli/coverage.svg)](https://qlty.sh/gh/bodrovis/projects/lokex-cli)
+[![Maintainability](https://qlty.sh/gh/bodrovis/projects/lokex-cli/maintainability.svg)](https://qlty.sh/gh/bodrovis/projects/lokex-cli)
+
 `lokex-cli` is a focused CLI built specifically for **file exchange with Lokalise** on top of [`lokex`](https://github.com/bodrovis/lokex).
 
 It is intentionally narrow in scope, so you can only upload and download files. This tool is meant to be a fast, optimized workflow for import/export operations.
