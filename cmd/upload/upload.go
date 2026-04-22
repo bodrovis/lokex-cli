@@ -14,9 +14,13 @@ import (
 
 type uploader interface {
 	Upload(ctx context.Context, params lokexupload.UploadParams, srcPath string, poll bool) (string, error)
+	UploadBatch(ctx context.Context, items []lokexupload.BatchUploadItem, poll bool) (lokexupload.BatchUploadResult, error)
 }
 
-var newUploaderFunc = newUploader
+var (
+	newUploaderFunc = newUploader
+	buildParamsFunc = buildParams
+)
 
 func NewCommand(cfg *globalCfg.GlobalConfig, defaults *UploadConfig) *cobra.Command {
 	flags := newFlags()
@@ -43,6 +47,10 @@ func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
 		return err
 	}
 
+	if strings.TrimSpace(flags.Manifest) != "" {
+		return nil
+	}
+
 	if strings.TrimSpace(flags.Filename) == "" {
 		return fmt.Errorf("--filename is required")
 	}
@@ -63,7 +71,11 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 	ctx, cancel := newCommandContext(cfg.ContextTimeout)
 	defer cancel()
 
-	params, err := buildParams(cmd, flags, defaults)
+	if strings.TrimSpace(flags.Manifest) != "" {
+		return runManifestCommand(cmd, up, flags, ctx)
+	}
+
+	params, err := buildParamsFunc(cmd, flags, defaults)
 	if err != nil {
 		return err
 	}

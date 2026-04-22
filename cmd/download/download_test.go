@@ -45,6 +45,35 @@ func (m *mockDownloader) DownloadAsync(ctx context.Context, out string, params l
 	return m.downloadAsyncURL, m.downloadAsyncErr
 }
 
+func TestNewDownloader(t *testing.T) {
+	t.Run("returns error when client config is invalid", func(t *testing.T) {
+		cfg := &globalCfg.GlobalConfig{}
+
+		got, err := newDownloader(cfg)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if got != nil {
+			t.Fatalf("expected nil downloader, got %#v", got)
+		}
+	})
+
+	t.Run("returns downloader when client config is valid", func(t *testing.T) {
+		cfg := &globalCfg.GlobalConfig{
+			Token:     "token",
+			ProjectID: "project-id",
+		}
+
+		got, err := newDownloader(cfg)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got == nil {
+			t.Fatal("expected non-nil downloader")
+		}
+	})
+}
+
 func TestNewCommand(t *testing.T) {
 	cfg := &globalCfg.GlobalConfig{}
 
@@ -357,6 +386,50 @@ func TestTruncateURLForOutput(t *testing.T) {
 				t.Fatalf("unexpected result: got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNewCommand_Execute_RunE(t *testing.T) {
+	old := newDownloaderFunc
+	t.Cleanup(func() {
+		newDownloaderFunc = old
+	})
+
+	md := &mockDownloader{
+		downloadURL: "https://example.com/file.zip",
+	}
+	newDownloaderFunc = func(cfg *globalCfg.GlobalConfig) (downloader, error) {
+		return md, nil
+	}
+
+	cfg := &globalCfg.GlobalConfig{
+		Token:     "token",
+		ProjectID: "project-id",
+	}
+
+	cmd := NewCommand(cfg, nil)
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{
+		"--format=json",
+		"--out=./locales",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !md.downloadCalled {
+		t.Fatal("expected Download to be called")
+	}
+	if md.gotOut != "./locales" {
+		t.Fatalf("unexpected out: got %q", md.gotOut)
+	}
+	if md.gotParams["format"] != "json" {
+		t.Fatalf("unexpected params: %#v", md.gotParams)
 	}
 }
 

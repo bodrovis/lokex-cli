@@ -7,6 +7,8 @@ type UploadConfig struct {
 	LangISO  *string `mapstructure:"lang-iso"`
 	Poll     *bool   `mapstructure:"poll"`
 
+	Manifest *string `mapstructure:"manifest"`
+
 	ConvertPlaceholders                 *bool     `mapstructure:"convert-placeholders"`
 	DetectICUPlurals                    *bool     `mapstructure:"detect-icu-plurals"`
 	Tags                                *[]string `mapstructure:"tags"`

@@ -123,7 +123,117 @@ lokex-cli upload \
   --tags backend,release
 ```
 
-## `filename` and `src-path`
+## Batch upload via manifest
+
+The `upload` command supports batch uploads using a JSON manifest file:
+
+```
+lokex upload --manifest path/to/manifest.json
+```
+
+When `--manifest` is provided:
+
+* Upload parameters are taken from the manifest file
+* CLI upload flags (e.g. `--filename`, `--lang-iso`, etc.) are ignored
+* Global options `--token` and `--project-id` are still used (and can be read from ENV or YAML file)
+
+### Manifest format
+
+The manifest is a JSON file with the following structure:
+
+```json
+{
+  "items": [
+    {
+      "params": {
+        "filename": "locales/en.json",
+        "lang_iso": "en"
+      }
+    },
+    {
+      "params": {
+        "filename": "locales/%LANG_ISO%.json",
+        "lang_iso": "de"
+      },
+      "src_path": "./de.json"
+    }
+  ]
+}
+```
+
+Fields:
+
+* `items` — list of upload entries
+
+Each item contains:
+
+* `params` *(required)* — key-value map of upload parameters (same as single upload API)
+  * Must include at least:
+    * `filename`
+    * `lang_iso`
+* `src_path` *(optional)* — local file path to read file contents from
+
+### File resolution
+
+* If `src_path` is provided:
+  * File contents are read from this path
+* If `src_path` is not provided:
+  * The uploader attempts to read file contents from `params.filename`
+
+Note on relative raths:
+
+* `src_path` is resolved relative to the directory of the manifest file
+* Absolute paths are used as-is
+
+Example:
+
+```
+/configs/batch/manifest.json
+/configs/batch/de.json
+```
+
+```json
+{
+  "src_path": "de.json"
+}
+```
+
+Will resolve to:
+
+```
+/configs/batch/de.json
+```
+
+### Behavior
+
+* All uploads are started in parallel (up to parallel 6 requests)
+* If `--poll` is enabled:
+  * The command waits for all uploads to complete
+* If `--poll` is disabled:
+  * The command returns immediately after starting uploads
+
+### Output
+
+Each item produces its own result:
+
+* Success:
+  * `Upload started` or `Upload completed`
+* Failure:
+  * `Upload failed` with error details
+
+At the end, a summary is printed:
+
+```
+Batch summary: total=N success=X failed=Y
+```
+
+### Error handling
+
+* Errors are reported per item
+* The command does not fail on partial errors
+* Only fatal batch-level errors (e.g. invalid manifest, request failure) cause the command to exit with error
+
+## Uploads: `filename` and `src-path`
 
 For most uploads, you only need `--filename`.
 

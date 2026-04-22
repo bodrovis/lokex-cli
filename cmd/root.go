@@ -12,9 +12,11 @@ import (
 
 var version = "dev"
 
-type loadGlobalConfigInputFunc func(string, global_config.LoadOptions) (*global_config.GlobalConfigInput, error)
-type loadUploadConfigFunc func(*uploadcmd.UploadConfig, string, string) error
-type loadDownloadConfigFunc func(*downloadcmd.DownloadConfig, string, string) error
+type (
+	loadGlobalConfigInputFunc func(string, global_config.LoadOptions) (*global_config.GlobalConfigInput, error)
+	loadUploadConfigFunc      func(*uploadcmd.UploadConfig, string, string) error
+	loadDownloadConfigFunc    func(*downloadcmd.DownloadConfig, string, string) error
+)
 
 func RootCmd() *cobra.Command {
 	return newRootCmd(

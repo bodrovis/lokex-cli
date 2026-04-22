@@ -13,6 +13,28 @@ type UploadParamSpec = params.ParamSpec[Flags, UploadConfig, lokexupload.UploadP
 
 var uploadParamSpecs = []UploadParamSpec{
 	{
+		FlagName:  "manifest",
+		ConfigKey: "upload.manifest",
+		BindFlag: func(cmd *cobra.Command, flags *Flags) {
+			cmd.Flags().StringVar(
+				&flags.Manifest,
+				"manifest",
+				flags.Manifest,
+				"Path to JSON manifest for batch upload",
+			)
+		},
+		ApplyDefault: func(cmd *cobra.Command, flags *Flags, cfg *UploadConfig) {
+			if !cmd.Flags().Changed("manifest") && cfg.Manifest != nil {
+				flags.Manifest = *cfg.Manifest
+			}
+		},
+		LoadFromViper: func(v *viper.Viper, cfg *UploadConfig) {
+			vh.ApplyConfigValue(v, "upload.manifest", func(val string) {
+				cfg.Manifest = &val
+			})
+		},
+	},
+	{
 		FlagName:  "filename",
 		ConfigKey: "upload.filename",
 		BindFlag: func(cmd *cobra.Command, flags *Flags) {

@@ -12,6 +12,8 @@ type Flags struct {
 	LangISO  string
 	Poll     bool
 
+	Manifest string
+
 	ConvertPlaceholders                 bool
 	DetectICUPlurals                    bool
 	Tags                                []string

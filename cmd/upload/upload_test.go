@@ -16,14 +16,21 @@ import (
 
 type mockUploader struct {
 	uploadCalled bool
+	batchCalled  bool
 
 	gotCtx     context.Context
 	gotParams  lokexupload.UploadParams
 	gotSrcPath string
 	gotPoll    bool
 
-	result string
-	err    error
+	gotBatchCtx   context.Context
+	gotBatchItems []lokexupload.BatchUploadItem
+	gotBatchPoll  bool
+
+	result      string
+	err         error
+	batchResult lokexupload.BatchUploadResult
+	batchErr    error
 }
 
 func (m *mockUploader) Upload(
@@ -38,6 +45,47 @@ func (m *mockUploader) Upload(
 	m.gotSrcPath = srcPath
 	m.gotPoll = poll
 	return m.result, m.err
+}
+
+func (m *mockUploader) UploadBatch(
+	ctx context.Context,
+	items []lokexupload.BatchUploadItem,
+	poll bool,
+) (lokexupload.BatchUploadResult, error) {
+	m.batchCalled = true
+	m.gotBatchCtx = ctx
+	m.gotBatchItems = items
+	m.gotBatchPoll = poll
+	return m.batchResult, m.batchErr
+}
+
+func TestNewUploader(t *testing.T) {
+	t.Run("returns error when client config is invalid", func(t *testing.T) {
+		cfg := &global_config.GlobalConfig{}
+
+		got, err := newUploader(cfg)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if got != nil {
+			t.Fatalf("expected nil uploader, got %#v", got)
+		}
+	})
+
+	t.Run("returns uploader when client config is valid", func(t *testing.T) {
+		cfg := &global_config.GlobalConfig{
+			Token:     "token",
+			ProjectID: "project-id",
+		}
+
+		got, err := newUploader(cfg)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got == nil {
+			t.Fatal("expected non-nil uploader")
+		}
+	})
 }
 
 func TestNewCommand(t *testing.T) {
@@ -82,6 +130,28 @@ func TestValidateCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "ok with manifest only",
+			cfg: &global_config.GlobalConfig{
+				Token:     "token",
+				ProjectID: "project-id",
+			},
+			flags: &Flags{
+				Manifest: "manifest.json",
+			},
+		},
+		{
+			name: "ok with manifest and whitespace filename/lang iso",
+			cfg: &global_config.GlobalConfig{
+				Token:     "token",
+				ProjectID: "project-id",
+			},
+			flags: &Flags{
+				Manifest: "manifest.json",
+				Filename: "   ",
+				LangISO:  "   ",
+			},
+		},
+		{
 			name: "missing token",
 			cfg: &global_config.GlobalConfig{
 				ProjectID: "project-id",
@@ -93,6 +163,16 @@ func TestValidateCommand(t *testing.T) {
 			wantErr: "--token is required",
 		},
 		{
+			name: "missing token with manifest",
+			cfg: &global_config.GlobalConfig{
+				ProjectID: "project-id",
+			},
+			flags: &Flags{
+				Manifest: "manifest.json",
+			},
+			wantErr: "--token is required",
+		},
+		{
 			name: "missing project id",
 			cfg: &global_config.GlobalConfig{
 				Token: "token",
@@ -100,6 +180,16 @@ func TestValidateCommand(t *testing.T) {
 			flags: &Flags{
 				Filename: "en.json",
 				LangISO:  "en",
+			},
+			wantErr: "--project-id is required",
+		},
+		{
+			name: "missing project id with manifest",
+			cfg: &global_config.GlobalConfig{
+				Token: "token",
+			},
+			flags: &Flags{
+				Manifest: "manifest.json",
 			},
 			wantErr: "--project-id is required",
 		},
@@ -431,6 +521,54 @@ func TestRunCommand(t *testing.T) {
 		gotOutput := out.String()
 		if !strings.Contains(gotOutput, "Upload completed: bundle-456") {
 			t.Fatalf("unexpected output: %q", gotOutput)
+		}
+	})
+
+	t.Run("build params error", func(t *testing.T) {
+		oldUploader := newUploaderFunc
+		oldBuildParams := buildParamsFunc
+		t.Cleanup(func() {
+			newUploaderFunc = oldUploader
+			buildParamsFunc = oldBuildParams
+		})
+
+		mu := &mockUploader{}
+		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+			return mu, nil
+		}
+
+		buildParamsFunc = func(cmd *cobra.Command, flags *Flags, defaults *UploadConfig) (lokexupload.UploadParams, error) {
+			return nil, errors.New("build params failed")
+		}
+
+		cfg := &global_config.GlobalConfig{
+			Token:     "token",
+			ProjectID: "project-id",
+		}
+		flags := newFlags()
+		flags.SrcPath = "./locales/en.json"
+
+		cmd := newBoundTestCommand(flags)
+		if err := cmd.Flags().Parse([]string{
+			"--filename=en.json",
+			"--lang-iso=en",
+		}); err != nil {
+			t.Fatalf("parse flags: %v", err)
+		}
+
+		err := runCommand(cmd, cfg, flags, nil)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if err.Error() != "build params failed" {
+			t.Fatalf("unexpected error: %q", err.Error())
+		}
+
+		if mu.uploadCalled {
+			t.Fatal("expected Upload not to be called")
+		}
+		if mu.batchCalled {
+			t.Fatal("expected UploadBatch not to be called")
 		}
 	})
 

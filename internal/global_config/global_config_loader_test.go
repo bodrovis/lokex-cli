@@ -20,6 +20,7 @@ project-id: file-project
 http-timeout: 45s
 retries: 2
 context-timeout: 100s
+base-url: https://example.com
 `), 0o644)
 	require.NoError(t, err)
 
@@ -44,6 +45,9 @@ context-timeout: 100s
 
 	require.NotNil(t, input.MaxRetries)
 	require.Equal(t, 2, *input.MaxRetries)
+
+	require.NotNil(t, input.BaseURL)
+	require.Equal(t, "https://example.com", *input.BaseURL)
 }
 
 func TestLoadGlobalConfigInput_NoConfigFile(t *testing.T) {
@@ -105,6 +109,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 	retries := 2
 	token := "file-token"
 	contextTimeout := 60 * time.Second
+	baseUrl := "https://example.com"
 
 	input := &GlobalConfigInput{
 		Token:          &token,
@@ -112,6 +117,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 		HTTPTimeout:    &timeout,
 		MaxRetries:     &retries,
 		ContextTimeout: &contextTimeout,
+		BaseURL:        &baseUrl,
 	}
 
 	ApplyGlobalDefaults(cmd, cfg, input)
@@ -121,6 +127,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 	require.Equal(t, 30*time.Second, cfg.HTTPTimeout)
 	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
 	require.Equal(t, 2, cfg.MaxRetries)
+	require.Equal(t, "https://example.com", cfg.BaseURL)
 }
 
 func TestApplyGlobalDefaults_InputOnly(t *testing.T) {

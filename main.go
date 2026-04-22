@@ -2,16 +2,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/bodrovis/lokex-cli/cmd"
 	"github.com/spf13/cobra"
 )
 
+var (
+	runFunc            = run
+	exitFunc           = os.Exit
+	stderr   io.Writer = os.Stderr
+)
+
 func main() {
-	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "command failed: %v\n", err)
-		os.Exit(1)
+	if err := runFunc(os.Args[1:]); err != nil {
+		fmt.Fprintf(stderr, "command failed: %v\n", err)
+		exitFunc(1)
 	}
 }
 
