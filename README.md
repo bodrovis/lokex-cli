@@ -70,12 +70,6 @@ steps:
   - run: lokex-cli version
 ```
 
-## Notes
-
--   Linux/macOS default: `~/.local/bin`
--   Windows default: `%LOCALAPPDATA%\Programs\lokex-cli\bin`
--   Make sure the install directory is included in your `PATH`
-
 ## Documentation
 
 Detailed command docs are generated in:
