@@ -11,6 +11,71 @@ It is intentionally narrow in scope, so you can only upload and download files. 
 
 If you need a broader Lokalise command set, use the [official CLI instead](https://github.com/lokalise/lokalise-cli-2-go). 
 
+## Installation
+
+There are several ways to install `lokex-cli`, depending on your
+environment.
+
+### Download prebuilt binaries
+
+Download the latest release for your OS and architecture from the [Releases page](https://github.com/bodrovis/lokex-cli/releases).
+
+### Linux / macOS (install script)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bodrovis/lokex-cli/master/install.sh | sh
+```
+
+Install a specific version:
+
+```bash
+VERSION=0.2.0 curl -fsSL https://raw.githubusercontent.com/bodrovis/lokex-cli/master/install.sh | sh
+```
+
+Install to a custom directory:
+
+```bash
+INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/bodrovis/lokex-cli/master/install.sh | sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+$script = "$env:TEMP\install-lokex.ps1"
+Invoke-WebRequest "https://raw.githubusercontent.com/bodrovis/lokex-cli/master/install.ps1" -OutFile $script
+powershell -ExecutionPolicy Bypass -File $script
+```
+
+Install a specific version:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File $script -Version 0.2.0
+```
+
+Install to a custom directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File $script -InstallDir "$env:LOCALAPPDATA\Programs\lokex-cli\bin"
+```
+
+### GitHub Actions
+
+Install `lokex-cli` in workflows using the [install-lokex-cli action](https://github.com/bodrovis/install-lokex-cli).
+
+Example:
+
+``` yaml
+steps:
+  - uses: bodrovis/install-lokex-cli@v1
+  - run: lokex-cli version
+```
+
+## Notes
+
+-   Linux/macOS default: `~/.local/bin`
+-   Windows default: `%LOCALAPPDATA%\Programs\lokex-cli\bin`
+-   Make sure the install directory is included in your `PATH`
+
 ## Documentation
 
 Detailed command docs are generated in:
