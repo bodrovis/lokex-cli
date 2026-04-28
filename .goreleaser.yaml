@@ -18,9 +18,9 @@ builds:
     ldflags:
       - >-
         -s -w
-        -X github.com/bodrovis/lokalise-glossary-guard/cmd.version={{ .Version }}
-        -X github.com/bodrovis/lokalise-glossary-guard/cmd.commit={{ .Commit }}
-        -X github.com/bodrovis/lokalise-glossary-guard/cmd.date={{ .CommitDate }}
+        -X github.com/bodrovis/lokex-cli/cmd.version={{ .Version }}
+        -X github.com/bodrovis/lokex-cli/cmd.commit={{ .Commit }}
+        -X github.com/bodrovis/lokex-cli/cmd.date={{ .CommitDate }}
     mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - linux
