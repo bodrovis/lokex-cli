@@ -29,7 +29,7 @@ func LoadGlobalConfigInput(userAgent string, opts LoadOptions) (*GlobalConfigInp
 	return &input, nil
 }
 
-func ApplyGlobalDefaults(cmd *cobra.Command, cfg *GlobalConfig, input *GlobalConfigInput) {
+func ApplyGlobalInput(cmd *cobra.Command, cfg *GlobalConfig, input *GlobalConfigInput) {
 	if input == nil {
 		return
 	}

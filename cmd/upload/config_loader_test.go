@@ -17,6 +17,17 @@ func TestLoadUploadConfig_IgnoresMissingImplicitConfig(t *testing.T) {
 	}
 }
 
+func TestLoadUploadConfig_ReturnsErrorWhenConfigIsNil(t *testing.T) {
+	err := LoadUploadConfig(nil, "", "LOKEX")
+	if err == nil {
+		t.Fatal("expected error for nil upload config")
+	}
+
+	if !strings.Contains(err.Error(), "upload config is nil") {
+		t.Fatalf("expected nil config error, got %v", err)
+	}
+}
+
 func TestLoadUploadConfig_ReturnsErrorForMissingExplicitConfig(t *testing.T) {
 	cfg := &UploadConfig{}
 

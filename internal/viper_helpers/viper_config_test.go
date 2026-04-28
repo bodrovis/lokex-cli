@@ -56,7 +56,52 @@ func TestNewConfigViper_ReadsDefaultConfigFromCurrentDirectory(t *testing.T) {
 	}
 }
 
-func TestNewConfigViper_ReadsDefaultConfigFromHomeConfigDir(t *testing.T) {
+func TestNewConfigViper_ReadsDefaultConfigFromUserConfigDir(t *testing.T) {
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origWD)
+	}()
+
+	emptyWD := t.TempDir()
+	if err := os.Chdir(emptyWD); err != nil {
+		t.Fatalf("failed to change working directory: %v", err)
+	}
+
+	configRoot := t.TempDir()
+
+	origUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) {
+		return configRoot, nil
+	}
+	defer func() {
+		userConfigDir = origUserConfigDir
+	}()
+
+	configDir := filepath.Join(configRoot, "lokex-cli")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("failed to create config directory: %v", err)
+	}
+
+	configFile := filepath.Join(configDir, "lokex.yaml")
+	if err := os.WriteFile(configFile, []byte("token: from-user-config\n"), 0o644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	v := NewConfigViper("", "LOKEX")
+
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatalf("expected config from user config dir to be readable, got error: %v", err)
+	}
+
+	if got := v.GetString("token"); got != "from-user-config" {
+		t.Fatalf("expected token from user config dir, got %q", got)
+	}
+}
+
+func TestNewConfigViper_ReadsDefaultConfigFromHomeConfigDirWhenUserConfigDirFails(t *testing.T) {
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
@@ -71,6 +116,14 @@ func TestNewConfigViper_ReadsDefaultConfigFromHomeConfigDir(t *testing.T) {
 	}
 
 	homeDir := t.TempDir()
+
+	origUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) {
+		return "", errors.New("user config dir unavailable")
+	}
+	defer func() {
+		userConfigDir = origUserConfigDir
+	}()
 
 	origUserHomeDir := userHomeDir
 	userHomeDir = func() (string, error) {
@@ -101,7 +154,7 @@ func TestNewConfigViper_ReadsDefaultConfigFromHomeConfigDir(t *testing.T) {
 	}
 }
 
-func TestNewConfigViper_CurrentDirectoryTakesPrecedenceOverHomeConfigDir(t *testing.T) {
+func TestNewConfigViper_CurrentDirectoryTakesPrecedenceOverUserConfigDir(t *testing.T) {
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
@@ -115,7 +168,64 @@ func TestNewConfigViper_CurrentDirectoryTakesPrecedenceOverHomeConfigDir(t *test
 		t.Fatalf("failed to change working directory: %v", err)
 	}
 
+	configRoot := t.TempDir()
+
+	origUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) {
+		return configRoot, nil
+	}
+	defer func() {
+		userConfigDir = origUserConfigDir
+	}()
+
+	if err := os.WriteFile(filepath.Join(wd, "lokex.yaml"), []byte("token: from-current-dir\n"), 0o644); err != nil {
+		t.Fatalf("failed to write current directory config: %v", err)
+	}
+
+	userConfigDirPath := filepath.Join(configRoot, "lokex-cli")
+	if err := os.MkdirAll(userConfigDirPath, 0o755); err != nil {
+		t.Fatalf("failed to create user config directory: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(userConfigDirPath, "lokex.yaml"), []byte("token: from-user-config\n"), 0o644); err != nil {
+		t.Fatalf("failed to write user config: %v", err)
+	}
+
+	v := NewConfigViper("", "LOKEX")
+
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatalf("expected config to be readable, got error: %v", err)
+	}
+
+	if got := v.GetString("token"); got != "from-current-dir" {
+		t.Fatalf("expected current directory config to take precedence, got %q", got)
+	}
+}
+
+func TestNewConfigViper_UserConfigDirTakesPrecedenceOverHomeConfigDir(t *testing.T) {
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(origWD)
+	}()
+
+	emptyWD := t.TempDir()
+	if err := os.Chdir(emptyWD); err != nil {
+		t.Fatalf("failed to change working directory: %v", err)
+	}
+
+	configRoot := t.TempDir()
 	homeDir := t.TempDir()
+
+	origUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) {
+		return configRoot, nil
+	}
+	defer func() {
+		userConfigDir = origUserConfigDir
+	}()
 
 	origUserHomeDir := userHomeDir
 	userHomeDir = func() (string, error) {
@@ -125,8 +235,13 @@ func TestNewConfigViper_CurrentDirectoryTakesPrecedenceOverHomeConfigDir(t *test
 		userHomeDir = origUserHomeDir
 	}()
 
-	if err := os.WriteFile(filepath.Join(wd, "lokex.yaml"), []byte("token: from-current-dir\n"), 0o644); err != nil {
-		t.Fatalf("failed to write current directory config: %v", err)
+	userConfigDirPath := filepath.Join(configRoot, "lokex-cli")
+	if err := os.MkdirAll(userConfigDirPath, 0o755); err != nil {
+		t.Fatalf("failed to create user config directory: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(userConfigDirPath, "lokex.yaml"), []byte("token: from-user-config\n"), 0o644); err != nil {
+		t.Fatalf("failed to write user config: %v", err)
 	}
 
 	homeConfigDir := filepath.Join(homeDir, ".config", "lokex-cli")
@@ -144,8 +259,8 @@ func TestNewConfigViper_CurrentDirectoryTakesPrecedenceOverHomeConfigDir(t *test
 		t.Fatalf("expected config to be readable, got error: %v", err)
 	}
 
-	if got := v.GetString("token"); got != "from-current-dir" {
-		t.Fatalf("expected current directory config to take precedence, got %q", got)
+	if got := v.GetString("token"); got != "from-user-config" {
+		t.Fatalf("expected user config dir to take precedence over home config dir, got %q", got)
 	}
 }
 
@@ -205,7 +320,7 @@ func TestNewConfigViper_EnvOverridesConfigValues(t *testing.T) {
 	}
 }
 
-func TestNewConfigViper_IgnoresHomeDirWhenUserHomeDirFails(t *testing.T) {
+func TestNewConfigViper_IgnoresConfigDirsWhenUserConfigDirAndUserHomeDirFail(t *testing.T) {
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
@@ -219,9 +334,17 @@ func TestNewConfigViper_IgnoresHomeDirWhenUserHomeDirFails(t *testing.T) {
 		t.Fatalf("failed to change working directory: %v", err)
 	}
 
+	origUserConfigDir := userConfigDir
+	userConfigDir = func() (string, error) {
+		return "", errors.New("user config dir boom")
+	}
+	defer func() {
+		userConfigDir = origUserConfigDir
+	}()
+
 	origUserHomeDir := userHomeDir
 	userHomeDir = func() (string, error) {
-		return "", errors.New("boom")
+		return "", errors.New("home dir boom")
 	}
 	defer func() {
 		userHomeDir = origUserHomeDir

@@ -9,7 +9,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Show version info",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Printf("lokex-cli %s\n", version)
+			cmd.Printf("lokex-cli %s\ncommit: %s\nbuilt at: %s\n", version, commit, date)
 		},
 	}
 }

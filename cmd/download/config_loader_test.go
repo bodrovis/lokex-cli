@@ -26,6 +26,17 @@ func TestLoadDownloadConfig_ReturnsErrorForMissingExplicitConfig(t *testing.T) {
 	}
 }
 
+func TestLoadDownloadConfig_ReturnsErrorWhenConfigIsNil(t *testing.T) {
+	err := LoadDownloadConfig(nil, "", "LOKEX")
+	if err == nil {
+		t.Fatal("expected error for nil download config")
+	}
+
+	if !strings.Contains(err.Error(), "download config is nil") {
+		t.Fatalf("expected nil config error, got %v", err)
+	}
+}
+
 func TestLoadDownloadConfig_ReturnsErrorForInvalidExplicitConfig(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "broken.yaml")
 	if err := os.WriteFile(configFile, []byte(":\nbad yaml"), 0o644); err != nil {

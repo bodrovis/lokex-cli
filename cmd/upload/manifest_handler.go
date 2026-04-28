@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,19 +44,21 @@ func runManifestCommand(
 	flags *Flags,
 	ctx context.Context,
 ) error {
-	mf, err := loadManifestFileFunc(flags.Manifest)
+	manifestPath := strings.TrimSpace(flags.Manifest)
+
+	mf, err := loadManifestFileFunc(manifestPath)
 	if err != nil {
 		return err
 	}
 
-	items, err := buildBatchUploadItemsFunc(flags.Manifest, mf)
+	items, err := buildBatchUploadItemsFunc(manifestPath, mf)
 	if err != nil {
 		return err
 	}
 
 	result, err := performBatchUploadFunc(ctx, up, flags, items)
 	if err != nil {
-		return fmt.Errorf("upload batch from manifest %q: %w", flags.Manifest, err)
+		return fmt.Errorf("upload batch from manifest %q: %w", manifestPath, err)
 	}
 
 	printBatchUploadResult(cmd, result, flags.Poll)
@@ -69,7 +72,11 @@ func loadManifestFile(path string) (manifestFile, error) {
 	}
 
 	var mf manifestFile
-	if err := json.Unmarshal(data, &mf); err != nil {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
+	if err := dec.Decode(&mf); err != nil {
 		return manifestFile{}, fmt.Errorf("parse manifest file %q: %w", path, err)
 	}
 

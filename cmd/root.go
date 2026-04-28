@@ -10,7 +10,13 @@ import (
 	"github.com/bodrovis/lokex-cli/internal/global_config"
 )
 
-var version = "dev"
+const skipConfigAnnotation = "skipConfig"
+
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 type (
 	loadGlobalConfigInputFunc func(string, global_config.LoadOptions) (*global_config.GlobalConfigInput, error)
@@ -66,8 +72,14 @@ This tool is optimized for import/export workflows and direct access to file-rel
 	global_config.BindPersistentFlags(cmd.PersistentFlags(), cfg)
 	cmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to YAML config file")
 
-	cmd.AddCommand(newVersionCmd())
-	cmd.AddCommand(newGenDocsCmd(cmd))
+	versionCmd := newVersionCmd()
+	markSkipConfig(versionCmd)
+	cmd.AddCommand(versionCmd)
+
+	genDocsCmd := newGenDocsCmd(cmd)
+	markSkipConfig(genDocsCmd)
+	cmd.AddCommand(genDocsCmd)
+
 	cmd.AddCommand(downloadcmd.NewCommand(cfg, downloadCfg))
 	cmd.AddCommand(uploadcmd.NewCommand(cfg, uploadCfg))
 
@@ -84,6 +96,10 @@ func newPersistentPreRunE(
 	loadDownload loadDownloadConfigFunc,
 ) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if shouldSkipConfig(cmd) {
+			return nil
+		}
+
 		loadOpts := global_config.LoadOptions{
 			ConfigFile: *configFile,
 			EnvPrefix:  "LOKEX",
@@ -94,7 +110,7 @@ func newPersistentPreRunE(
 			return err
 		}
 
-		global_config.ApplyGlobalDefaults(cmd, cfg, globalInput)
+		global_config.ApplyGlobalInput(cmd, cfg, globalInput)
 
 		switch cmd.Name() {
 		case "upload":
@@ -109,4 +125,22 @@ func newPersistentPreRunE(
 
 		return nil
 	}
+}
+
+func markSkipConfig(cmd *cobra.Command) {
+	if cmd.Annotations == nil {
+		cmd.Annotations = make(map[string]string)
+	}
+
+	cmd.Annotations[skipConfigAnnotation] = "true"
+}
+
+func shouldSkipConfig(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Annotations[skipConfigAnnotation] == "true" {
+			return true
+		}
+	}
+
+	return false
 }

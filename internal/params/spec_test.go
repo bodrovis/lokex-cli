@@ -286,3 +286,130 @@ func TestApplyToRequest_StopsOnFirstError(t *testing.T) {
 		t.Fatalf("unexpected ApplyToRequest call order: got %v, want %v", called, wantCalled)
 	}
 }
+
+func TestBindFlags_SkipsNilCallbacks(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	flags := &testFlags{}
+
+	called := false
+
+	specs := []ParamSpec[testFlags, testCfg, *testReq]{
+		{},
+		{
+			BindFlag: func(cmd *cobra.Command, flags *testFlags) {
+				called = true
+				flags.Values = append(flags.Values, "called")
+			},
+		},
+	}
+
+	BindFlags(cmd, flags, specs)
+
+	if !called {
+		t.Fatal("expected non-nil BindFlag callback to be called")
+	}
+
+	want := []string{"called"}
+	if !reflect.DeepEqual(flags.Values, want) {
+		t.Fatalf("unexpected flags values: got %v, want %v", flags.Values, want)
+	}
+}
+
+func TestApplyDefaults_SkipsNilCallbacks(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	flags := &testFlags{}
+	cfg := &testCfg{}
+
+	called := false
+
+	specs := []ParamSpec[testFlags, testCfg, *testReq]{
+		{},
+		{
+			ApplyDefault: func(cmd *cobra.Command, flags *testFlags, cfg *testCfg) {
+				called = true
+				flags.Values = append(flags.Values, "called")
+				cfg.Values = append(cfg.Values, "called")
+			},
+		},
+	}
+
+	ApplyDefaults(cmd, flags, cfg, specs)
+
+	if !called {
+		t.Fatal("expected non-nil ApplyDefault callback to be called")
+	}
+
+	want := []string{"called"}
+
+	if !reflect.DeepEqual(flags.Values, want) {
+		t.Fatalf("unexpected flags values: got %v, want %v", flags.Values, want)
+	}
+
+	if !reflect.DeepEqual(cfg.Values, want) {
+		t.Fatalf("unexpected cfg values: got %v, want %v", cfg.Values, want)
+	}
+}
+
+func TestLoadFromViper_ReturnsImmediatelyWhenCfgIsNil(t *testing.T) {
+	v := viper.New()
+
+	called := false
+
+	specs := []ParamSpec[testFlags, testCfg, *testReq]{
+		{
+			LoadFromViper: func(v *viper.Viper, cfg *testCfg) {
+				called = true
+			},
+		},
+	}
+
+	LoadFromViper(v, nil, specs)
+
+	if called {
+		t.Fatal("expected LoadFromViper not to be called when cfg is nil")
+	}
+}
+
+func TestLoadFromViper_SkipsNilCallbacks(t *testing.T) {
+	v := viper.New()
+	cfg := &testCfg{}
+
+	called := false
+
+	specs := []ParamSpec[testFlags, testCfg, *testReq]{
+		{},
+		{
+			LoadFromViper: func(v *viper.Viper, cfg *testCfg) {
+				called = true
+				cfg.Values = append(cfg.Values, "called")
+			},
+		},
+	}
+
+	LoadFromViper(v, cfg, specs)
+
+	if !called {
+		t.Fatal("expected non-nil LoadFromViper callback to be called")
+	}
+
+	want := []string{"called"}
+	if !reflect.DeepEqual(cfg.Values, want) {
+		t.Fatalf("unexpected cfg values: got %v, want %v", cfg.Values, want)
+	}
+}
+
+func TestConfigKeys_SkipsBlankKeysAndTrimsWhitespace(t *testing.T) {
+	specs := []ParamSpec[testFlags, testCfg, *testReq]{
+		{ConfigKey: ""},
+		{ConfigKey: "   "},
+		{ConfigKey: " upload.filename "},
+		{ConfigKey: "\tupload.lang_iso\n"},
+	}
+
+	got := ConfigKeys(specs)
+	want := []string{"upload.filename", "upload.lang_iso"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected config keys: got %v, want %v", got, want)
+	}
+}

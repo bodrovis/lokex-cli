@@ -114,6 +114,22 @@ func TestValidateCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "missing cfg",
+			cfg:  nil,
+			flags: &Flags{
+				Format: "json",
+			},
+			wantErr: "global config is nil",
+		},
+		{
+			name: "missing flags",
+			cfg: &globalCfg.GlobalConfig{
+				ProjectID: "project-id",
+			},
+			flags:   nil,
+			wantErr: "download flags are nil",
+		},
+		{
 			name: "missing token",
 			cfg: &globalCfg.GlobalConfig{
 				ProjectID: "project-id",
@@ -171,44 +187,6 @@ func TestValidateCommand(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestNewCommandContext(t *testing.T) {
-	t.Run("background context when timeout is zero", func(t *testing.T) {
-		ctx, cancel := newCommandContext(0)
-		defer cancel()
-
-		if ctx == nil {
-			t.Fatal("expected non-nil context")
-		}
-		if _, ok := ctx.Deadline(); ok {
-			t.Fatal("expected no deadline for zero timeout")
-		}
-	})
-
-	t.Run("background context when timeout is negative", func(t *testing.T) {
-		ctx, cancel := newCommandContext(-1 * time.Second)
-		defer cancel()
-
-		if ctx == nil {
-			t.Fatal("expected non-nil context")
-		}
-		if _, ok := ctx.Deadline(); ok {
-			t.Fatal("expected no deadline for negative timeout")
-		}
-	})
-
-	t.Run("timeout context when timeout is positive", func(t *testing.T) {
-		ctx, cancel := newCommandContext(2 * time.Second)
-		defer cancel()
-
-		if ctx == nil {
-			t.Fatal("expected non-nil context")
-		}
-		if _, ok := ctx.Deadline(); !ok {
-			t.Fatal("expected deadline for positive timeout")
-		}
-	})
 }
 
 func TestPerformDownload(t *testing.T) {

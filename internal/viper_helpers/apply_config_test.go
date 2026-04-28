@@ -108,6 +108,26 @@ func TestApplyConfigValue_Int64_FallbackGetter(t *testing.T) {
 	}
 }
 
+func TestApplyConfigValue_Int_DirectType(t *testing.T) {
+	v := viper.New()
+	v.Set("key", int(42))
+
+	var got int
+	called := false
+
+	ApplyConfigValue[int](v, "key", func(val int) {
+		called = true
+		got = val
+	})
+
+	if !called {
+		t.Fatal("expected setter to be called")
+	}
+	if got != 42 {
+		t.Fatalf("unexpected value: got %d, want 42", got)
+	}
+}
+
 func TestApplyConfigValue_Duration_DirectType(t *testing.T) {
 	v := viper.New()
 	v.Set("key", 5*time.Second)
@@ -164,11 +184,11 @@ func TestApplyConfigValue_KeyNotSet_DoesNothing(t *testing.T) {
 
 func TestApplyConfigValue_UnsupportedType_DoesNothing(t *testing.T) {
 	v := viper.New()
-	v.Set("key", "123")
+	v.Set("key", "123.4")
 
 	called := false
 
-	ApplyConfigValue[int](v, "key", func(val int) {
+	ApplyConfigValue[float32](v, "key", func(val float32) {
 		called = true
 	})
 

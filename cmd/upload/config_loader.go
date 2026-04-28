@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"errors"
 	"fmt"
 
 	params "github.com/bodrovis/lokex-cli/internal/params"
@@ -9,6 +10,10 @@ import (
 )
 
 func LoadUploadConfig(cfg *UploadConfig, configFile, envPrefix string) error {
+	if cfg == nil {
+		return errors.New("upload config is nil")
+	}
+
 	v := vh.NewConfigViper(configFile, envPrefix)
 
 	if err := bindUploadEnv(v); err != nil {

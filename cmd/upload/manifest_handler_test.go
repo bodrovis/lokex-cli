@@ -3,6 +3,7 @@ package upload
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -556,6 +557,48 @@ func TestLoadManifestFile(t *testing.T) {
 		}
 		if got.Items[1].SrcPath != "./de.json" {
 			t.Fatalf("unexpected second src_path: got %q", got.Items[1].SrcPath)
+		}
+	})
+
+	t.Run("preserves numeric params as json.Number", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "manifest.json")
+
+		content := `{
+		"items": [
+			{
+				"params": {
+					"filename": "locales/en.json",
+					"lang_iso": "en",
+					"filter_task_id": 1234567890123456789
+				},
+				"src_path": "./en.json"
+			}
+		]
+	}`
+
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write manifest: %v", err)
+		}
+
+		got, err := loadManifestFile(path)
+		if err != nil {
+			t.Fatalf("loadManifestFile() error = %v", err)
+		}
+
+		if len(got.Items) != 1 {
+			t.Fatalf("unexpected items len: got %d, want 1", len(got.Items))
+		}
+
+		raw := got.Items[0].Params["filter_task_id"]
+
+		num, ok := raw.(json.Number)
+		if !ok {
+			t.Fatalf("expected filter_task_id to be json.Number, got %T (%#v)", raw, raw)
+		}
+
+		if num.String() != "1234567890123456789" {
+			t.Fatalf("unexpected filter_task_id: got %q", num.String())
 		}
 	})
 

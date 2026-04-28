@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
+	commandctx "github.com/bodrovis/lokex-cli/internal/commandctx"
 	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
 )
@@ -40,6 +40,14 @@ func NewCommand(cfg *globalCfg.GlobalConfig, defaults *DownloadConfig) *cobra.Co
 }
 
 func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
+	if cfg == nil {
+		return fmt.Errorf("global config is nil")
+	}
+
+	if flags == nil {
+		return fmt.Errorf("download flags are nil")
+	}
+
 	if err := cfg.ValidateClientConfig(); err != nil {
 		return err
 	}
@@ -57,7 +65,7 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 		return err
 	}
 
-	ctx, cancel := newCommandContext(cfg.ContextTimeout)
+	ctx, cancel := commandctx.NewCommandContext(cfg.ContextTimeout)
 	defer cancel()
 
 	params, err := buildParams(cmd, flags, defaults)
@@ -82,14 +90,6 @@ func newDownloader(cfg *globalCfg.GlobalConfig) (downloader, error) {
 	}
 
 	return lokexdownload.NewDownloader(client), nil
-}
-
-func newCommandContext(timeout time.Duration) (context.Context, context.CancelFunc) {
-	if timeout <= 0 {
-		return context.Background(), func() {}
-	}
-
-	return context.WithTimeout(context.Background(), timeout)
 }
 
 func printDownloadResult(cmd *cobra.Command, url string) {

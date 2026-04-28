@@ -27,6 +27,8 @@ func ApplyConfigValue[T any](v *viper.Viper, key string, set func(T)) {
 		set(any(v.GetBool(key)).(T))
 	case int64:
 		set(any(v.GetInt64(key)).(T))
+	case int:
+		set(any(v.GetInt(key)).(T))
 	case time.Duration:
 		set(any(v.GetDuration(key)).(T))
 	}

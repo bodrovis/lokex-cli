@@ -7,13 +7,18 @@ import (
 )
 
 func (cfg *GlobalConfig) NewClient() (*lokexclient.Client, error) {
+	token := strings.TrimSpace(cfg.Token)
+	projectID := strings.TrimSpace(cfg.ProjectID)
+	baseURL := strings.TrimSpace(cfg.BaseURL)
+	userAgent := strings.TrimSpace(cfg.UserAgent)
+
 	opts := make([]lokexclient.Option, 0, 6)
 
-	if strings.TrimSpace(cfg.BaseURL) != "" {
-		opts = append(opts, lokexclient.WithBaseURL(cfg.BaseURL))
+	if baseURL != "" {
+		opts = append(opts, lokexclient.WithBaseURL(baseURL))
 	}
-	if strings.TrimSpace(cfg.UserAgent) != "" {
-		opts = append(opts, lokexclient.WithUserAgent(cfg.UserAgent))
+	if userAgent != "" {
+		opts = append(opts, lokexclient.WithUserAgent(userAgent))
 	}
 	if cfg.HTTPTimeout != 0 {
 		opts = append(opts, lokexclient.WithHTTPTimeout(cfg.HTTPTimeout))
@@ -28,5 +33,5 @@ func (cfg *GlobalConfig) NewClient() (*lokexclient.Client, error) {
 		opts = append(opts, lokexclient.WithPollWait(cfg.PollInitialWait, cfg.PollMaxWait))
 	}
 
-	return lokexclient.NewClient(cfg.Token, cfg.ProjectID, opts...)
+	return lokexclient.NewClient(token, projectID, opts...)
 }

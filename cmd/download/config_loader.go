@@ -1,6 +1,7 @@
 package download
 
 import (
+	"errors"
 	"fmt"
 
 	params "github.com/bodrovis/lokex-cli/internal/params"
@@ -9,6 +10,10 @@ import (
 )
 
 func LoadDownloadConfig(cfg *DownloadConfig, configFile, envPrefix string) error {
+	if cfg == nil {
+		return errors.New("download config is nil")
+	}
+
 	v := vh.NewConfigViper(configFile, envPrefix)
 
 	if err := bindDownloadEnv(v); err != nil {

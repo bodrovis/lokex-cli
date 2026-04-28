@@ -8,9 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func boolPtr(v bool) *bool    { return &v }
-func int64Ptr(v int64) *int64 { return &v }
-
 func TestReqString_SetsNonEmptyString(t *testing.T) {
 	req := lokexupload.UploadParams{}
 	flags := &Flags{Data: "YmFzZTY0"}
@@ -187,7 +184,7 @@ func TestReqBoolWithDefault_SetsFlagValueWhenFlagChanged(t *testing.T) {
 		func(c *UploadConfig) *bool { return c.ConvertPlaceholders },
 	)
 
-	err := fn(cmd, flags, &UploadConfig{ConvertPlaceholders: boolPtr(false)}, req)
+	err := fn(cmd, flags, &UploadConfig{ConvertPlaceholders: new(false)}, req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -211,7 +208,7 @@ func TestReqBoolWithDefault_SetsDefaultWhenFlagNotChanged(t *testing.T) {
 		func(c *UploadConfig) *bool { return c.ConvertPlaceholders },
 	)
 
-	err := fn(cmd, flags, &UploadConfig{ConvertPlaceholders: boolPtr(true)}, req)
+	err := fn(cmd, flags, &UploadConfig{ConvertPlaceholders: new(true)}, req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -263,7 +260,7 @@ func TestReqInt64WithDefault_SetsFlagValueWhenFlagChanged(t *testing.T) {
 		func(c *UploadConfig) *int64 { return c.FilterTaskID },
 	)
 
-	err := fn(cmd, flags, &UploadConfig{FilterTaskID: int64Ptr(999)}, req)
+	err := fn(cmd, flags, &UploadConfig{FilterTaskID: new(int64(999))}, req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -287,7 +284,7 @@ func TestReqInt64WithDefault_SetsDefaultWhenFlagNotChanged(t *testing.T) {
 		func(c *UploadConfig) *int64 { return c.FilterTaskID },
 	)
 
-	err := fn(cmd, flags, &UploadConfig{FilterTaskID: int64Ptr(456)}, req)
+	err := fn(cmd, flags, &UploadConfig{FilterTaskID: new(int64(456))}, req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

@@ -91,7 +91,7 @@ context-timeout: 0s
 	require.Equal(t, time.Duration(0), *input.PollMaxWait)
 }
 
-func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
+func TestApplyGlobalInput_FlagsOverrideInput(t *testing.T) {
 	cfg := &GlobalConfig{
 		UserAgent: "lokex-cli/test",
 	}
@@ -120,7 +120,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 		BaseURL:        &baseUrl,
 	}
 
-	ApplyGlobalDefaults(cmd, cfg, input)
+	ApplyGlobalInput(cmd, cfg, input)
 
 	require.Equal(t, "cli-token", cfg.Token)
 	require.Equal(t, "file-project", cfg.ProjectID)
@@ -130,7 +130,7 @@ func TestApplyGlobalDefaults_FlagsOverrideInput(t *testing.T) {
 	require.Equal(t, "https://example.com", cfg.BaseURL)
 }
 
-func TestApplyGlobalDefaults_InputOnly(t *testing.T) {
+func TestApplyGlobalInput_InputOnly(t *testing.T) {
 	cfg := &GlobalConfig{
 		UserAgent: "lokex-cli/test",
 	}
@@ -150,7 +150,7 @@ func TestApplyGlobalDefaults_InputOnly(t *testing.T) {
 		ContextTimeout: &contextTimeout,
 	}
 
-	ApplyGlobalDefaults(cmd, cfg, input)
+	ApplyGlobalInput(cmd, cfg, input)
 
 	require.Equal(t, "file-token", cfg.Token)
 	require.Equal(t, "file-project", cfg.ProjectID)
@@ -158,7 +158,7 @@ func TestApplyGlobalDefaults_InputOnly(t *testing.T) {
 	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
 }
 
-func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
+func TestApplyGlobalInput_InputCanSetZeroValues(t *testing.T) {
 	cfg := &GlobalConfig{
 		UserAgent:       "lokex-cli/test",
 		HTTPTimeout:     10 * time.Second,
@@ -186,7 +186,7 @@ func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
 		ContextTimeout:  &zeroDuration,
 	}
 
-	ApplyGlobalDefaults(cmd, cfg, input)
+	ApplyGlobalInput(cmd, cfg, input)
 
 	require.Equal(t, time.Duration(0), cfg.HTTPTimeout)
 	require.Equal(t, -1, cfg.MaxRetries)
@@ -197,7 +197,7 @@ func TestApplyGlobalDefaults_InputCanSetZeroValues(t *testing.T) {
 	require.Equal(t, time.Duration(0), cfg.ContextTimeout)
 }
 
-func TestApplyGlobalDefaults_FlagOverridesExplicitZeroFromInput(t *testing.T) {
+func TestApplyGlobalInput_FlagOverridesExplicitZeroFromInput(t *testing.T) {
 	cfg := &GlobalConfig{
 		UserAgent: "lokex-cli/test",
 	}
@@ -215,7 +215,7 @@ func TestApplyGlobalDefaults_FlagOverridesExplicitZeroFromInput(t *testing.T) {
 		HTTPTimeout: &zeroDuration,
 	}
 
-	ApplyGlobalDefaults(cmd, cfg, input)
+	ApplyGlobalInput(cmd, cfg, input)
 
 	require.Equal(t, 20*time.Second, cfg.HTTPTimeout)
 }

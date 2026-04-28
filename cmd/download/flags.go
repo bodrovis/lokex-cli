@@ -54,6 +54,5 @@ func newFlags() *Flags {
 }
 
 func bindFlags(cmd *cobra.Command, flags *Flags) {
-	// cmd.Flags().SortFlags = false
 	params.BindFlags(cmd, flags, downloadParamSpecs)
 }

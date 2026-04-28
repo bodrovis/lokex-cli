@@ -17,7 +17,7 @@ var (
 
 func main() {
 	if err := runFunc(os.Args[1:]); err != nil {
-		fmt.Fprintf(stderr, "command failed: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "command failed: %+v\n", err)
 		exitFunc(1)
 	}
 }
