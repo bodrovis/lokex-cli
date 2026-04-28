@@ -480,6 +480,16 @@ Run:
 go test -count=1 ./... -shuffle=on -race
 ```
 
+## Release verification
+
+Each release includes extra verification artifacts:
+
+- `*_checksums.txt` — SHA256 checksums for release files
+- `*_checksums.txt.sigstore.json` — Cosign signature bundle for the checksum file
+- `*.sbom.json` — SBOM files generated for release archives
+
+GitHub Artifact Attestations are available at: [github.com/bodrovis/lokex-cli/attestations](https://github.com/bodrovis/lokex-cli/attestations).
+
 ## License
 
 (c) [Elijah S. Krukowski](https://bodrovis.tech). Licensed under BSD 3-Clause
