@@ -9,6 +9,7 @@ import (
 
 	commandctx "github.com/bodrovis/lokex-cli/internal/commandctx"
 	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
+	params "github.com/bodrovis/lokex-cli/internal/params"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
 )
 
@@ -29,7 +30,7 @@ func NewCommand(cfg *globalCfg.GlobalConfig, defaults *UploadConfig) *cobra.Comm
 		Use:   "upload",
 		Short: "Upload translation files to Lokalise",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			applyDefaults(cmd, flags, defaults)
+			params.ApplyDefaults(cmd, flags, defaults, uploadParamSpecs)
 			return validateCommand(cfg, flags)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
