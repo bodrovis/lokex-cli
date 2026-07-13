@@ -45,22 +45,27 @@ jobs:
           UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
           UPX_SHA256="3db5d3294707439db97866feab8d75d800f028f48481a40547411824da4288a1"
 
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
           curl \
             --fail \
             --location \
             --silent \
             --show-error \
-            --output "$UPX_ARCHIVE" \
+            --output "$TMP_DIR/$UPX_ARCHIVE" \
             "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/${UPX_ARCHIVE}"
 
-          echo "${UPX_SHA256}  ${UPX_ARCHIVE}" |
+          echo "${UPX_SHA256}  $TMP_DIR/$UPX_ARCHIVE" |
             sha256sum --check -
 
-          tar -xJf "$UPX_ARCHIVE"
+          tar \
+            -xJf "$TMP_DIR/$UPX_ARCHIVE" \
+            -C "$TMP_DIR"
 
           sudo install \
             -m 0755 \
-            "upx-${UPX_VERSION}-amd64_linux/upx" \
+            "$TMP_DIR/upx-${UPX_VERSION}-amd64_linux/upx" \
             /usr/local/bin/upx
 
           upx --version
