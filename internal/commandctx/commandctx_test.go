@@ -1,114 +1,108 @@
 package commandctx
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
-func TestNewCommandContext_ZeroTimeoutReturnsBackgroundLikeContext(t *testing.T) {
-	ctx, cancel := NewCommandContext(0)
-	defer cancel()
-
-	if ctx == nil {
-		t.Fatal("expected context, got nil")
+func TestNewCommandContext_NonPositiveTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+	}{
+		{
+			name:    "zero",
+			timeout: 0,
+		},
+		{
+			name:    "negative",
+			timeout: -time.Second,
+		},
 	}
 
-	if deadline, ok := ctx.Deadline(); ok {
-		t.Fatalf("expected no deadline, got %v", deadline)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := NewCommandContext(tt.timeout)
 
-	if done := ctx.Done(); done != nil {
-		t.Fatal("expected nil Done channel for background context")
-	}
+			if ctx == nil {
+				t.Fatal("NewCommandContext() context = nil")
+			}
 
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("expected nil error before cancel, got %v", err)
-	}
+			if _, ok := ctx.Deadline(); ok {
+				t.Fatal("NewCommandContext() set a deadline, want none")
+			}
 
-	cancel()
+			if ctx.Done() != nil {
+				t.Fatal("NewCommandContext() Done() != nil, want nil")
+			}
 
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("expected nil error after noop cancel, got %v", err)
-	}
-}
+			cancel()
 
-func TestNewCommandContext_NegativeTimeoutReturnsBackgroundLikeContext(t *testing.T) {
-	ctx, cancel := NewCommandContext(-time.Second)
-	defer cancel()
-
-	if ctx == nil {
-		t.Fatal("expected context, got nil")
-	}
-
-	if deadline, ok := ctx.Deadline(); ok {
-		t.Fatalf("expected no deadline, got %v", deadline)
-	}
-
-	if done := ctx.Done(); done != nil {
-		t.Fatal("expected nil Done channel for background context")
-	}
-
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("context error after cancel = %v, want nil", err)
+			}
+		})
 	}
 }
 
 func TestNewCommandContext_PositiveTimeoutSetsDeadline(t *testing.T) {
-	timeout := 200 * time.Millisecond
+	synctest.Test(t, func(t *testing.T) {
+		const timeout = 200 * time.Millisecond
 
-	before := time.Now()
-	ctx, cancel := NewCommandContext(timeout)
-	defer cancel()
-	after := time.Now()
+		start := time.Now()
 
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		t.Fatal("expected deadline to be set")
-	}
+		ctx, cancel := NewCommandContext(timeout)
+		defer cancel()
 
-	minDeadline := before.Add(timeout)
-	maxDeadline := after.Add(timeout)
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Fatal("NewCommandContext() did not set deadline")
+		}
 
-	if deadline.Before(minDeadline) {
-		t.Fatalf("deadline is too early: got %v, want >= %v", deadline, minDeadline)
-	}
+		want := start.Add(timeout)
+		if !deadline.Equal(want) {
+			t.Fatalf("deadline = %v, want %v", deadline, want)
+		}
 
-	if deadline.After(maxDeadline) {
-		t.Fatalf("deadline is too late: got %v, want <= %v", deadline, maxDeadline)
-	}
-
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("expected nil error before timeout/cancel, got %v", err)
-	}
+		if err := ctx.Err(); err != nil {
+			t.Fatalf("context error = %v, want nil", err)
+		}
+	})
 }
 
 func TestNewCommandContext_PositiveTimeoutCanBeCanceled(t *testing.T) {
 	ctx, cancel := NewCommandContext(time.Hour)
-
 	cancel()
 
 	select {
 	case <-ctx.Done():
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("expected context to be canceled")
+	default:
+		t.Fatal("context was not canceled")
 	}
 
-	if err := ctx.Err(); err == nil {
-		t.Fatal("expected context error after cancel")
+	if !errors.Is(ctx.Err(), context.Canceled) {
+		t.Fatalf("context error = %v, want %v", ctx.Err(), context.Canceled)
 	}
 }
 
 func TestNewCommandContext_PositiveTimeoutExpires(t *testing.T) {
-	ctx, cancel := NewCommandContext(10 * time.Millisecond)
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		const timeout = time.Hour
 
-	select {
-	case <-ctx.Done():
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("expected context to expire")
-	}
+		ctx, cancel := NewCommandContext(timeout)
+		defer cancel()
 
-	if err := ctx.Err(); err == nil {
-		t.Fatal("expected context error after timeout")
-	}
+		synctest.Sleep(timeout)
+
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			t.Fatalf(
+				"context error = %v, want %v",
+				ctx.Err(),
+				context.DeadlineExceeded,
+			)
+		}
+	})
 }

@@ -1,13 +1,15 @@
 package upload
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 
 	"github.com/spf13/cobra"
 
@@ -27,6 +29,16 @@ var (
 	loadManifestFileFunc      = loadManifestFile
 	buildBatchUploadItemsFunc = buildBatchUploadItems
 	performBatchUploadFunc    = performBatchUpload
+)
+
+var preserveJSONNumbers = json.WithUnmarshalers(
+	json.UnmarshalFromFunc(func(dec *jsontext.Decoder, val *any) error {
+		if dec.PeekKind() == jsontext.KindNumber {
+			*val = jsontext.Value(nil)
+		}
+
+		return errors.ErrUnsupported
+	}),
 )
 
 func performBatchUpload(
@@ -66,22 +78,35 @@ func runManifestCommand(
 }
 
 func loadManifestFile(path string) (manifestFile, error) {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		return manifestFile{}, fmt.Errorf("read manifest file %q: %w", path, err)
+		return manifestFile{}, fmt.Errorf(
+			"read manifest file %q: %w",
+			path,
+			err,
+		)
 	}
+	defer func() { _ = f.Close() }()
 
 	var mf manifestFile
 
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-
-	if err := dec.Decode(&mf); err != nil {
-		return manifestFile{}, fmt.Errorf("parse manifest file %q: %w", path, err)
+	if err := json.UnmarshalRead(
+		f,
+		&mf,
+		preserveJSONNumbers,
+	); err != nil {
+		return manifestFile{}, fmt.Errorf(
+			"parse manifest file %q: %w",
+			path,
+			err,
+		)
 	}
 
 	if len(mf.Items) == 0 {
-		return manifestFile{}, fmt.Errorf("manifest file %q contains no items", path)
+		return manifestFile{}, fmt.Errorf(
+			"manifest file %q contains no items",
+			path,
+		)
 	}
 
 	return mf, nil

@@ -2,6 +2,7 @@ package download
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -299,15 +300,20 @@ func TestReqLanguageMapping_ParsesAndSetsValue(t *testing.T) {
 		t.Fatal("expected key to be set")
 	}
 
-	want := []map[string]any{
+	gotMappings, ok := got.([]languageMapping)
+	if !ok {
+		t.Fatalf("unexpected type: got %T, want []languageMapping", got)
+	}
+
+	want := []languageMapping{
 		{
-			"original_language_iso": "en",
-			"custom_language_iso":   "en-US",
+			OriginalLanguageISO: "en",
+			CustomLanguageISO:   "en-US",
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected value: got %#v, want %#v", got, want)
+	if !slices.Equal(gotMappings, want) {
+		t.Fatalf("unexpected value: got %#v, want %#v", gotMappings, want)
 	}
 }
 
@@ -332,25 +338,48 @@ func TestReqLanguageMapping_ReturnsWrappedErrorForInvalidJSON(t *testing.T) {
 }
 
 func TestParseLanguageMapping_ValidJSON(t *testing.T) {
-	got, err := parseLanguageMapping(`[{"original_language_iso":"en","custom_language_iso":"en-US"}]`)
+	got, err := parseLanguageMapping(
+		`[{"original_language_iso":"en","custom_language_iso":"en-US"}]`,
+	)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	want := []map[string]any{
+	want := []languageMapping{
 		{
-			"original_language_iso": "en",
-			"custom_language_iso":   "en-US",
+			OriginalLanguageISO: "en",
+			CustomLanguageISO:   "en-US",
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("unexpected value: got %#v, want %#v", got, want)
 	}
 }
 
-func TestParseLanguageMapping_InvalidJSON(t *testing.T) {
+func TestParseLanguageMapping_RejectsNonArray(t *testing.T) {
 	_, err := parseLanguageMapping(`{"not":"an array"}`)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseLanguageMapping_RejectsUnknownFields(t *testing.T) {
+	_, err := parseLanguageMapping(
+		`[{
+			"original_language_iso":"en",
+			"custom_language_iso":"en-US",
+			"wat":"oops"
+		}]`,
+	)
+
+	if err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestParseLanguageMapping_InvalidJSON(t *testing.T) {
+	_, err := parseLanguageMapping(`[{"original_language_iso":`)
 	if err == nil {
 		t.Fatal("expected error")
 	}

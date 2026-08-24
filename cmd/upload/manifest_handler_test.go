@@ -3,7 +3,7 @@ package upload
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"os"
@@ -560,7 +560,7 @@ func TestLoadManifestFile(t *testing.T) {
 		}
 	})
 
-	t.Run("preserves numeric params as json.Number", func(t *testing.T) {
+	t.Run("preserves numeric params as jsontext.Value", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "manifest.json")
 
@@ -592,13 +592,27 @@ func TestLoadManifestFile(t *testing.T) {
 
 		raw := got.Items[0].Params["filter_task_id"]
 
-		num, ok := raw.(json.Number)
+		num, ok := raw.(jsontext.Value)
 		if !ok {
-			t.Fatalf("expected filter_task_id to be json.Number, got %T (%#v)", raw, raw)
+			t.Fatalf(
+				"expected filter_task_id to be jsontext.Value, got %T (%#v)",
+				raw,
+				raw,
+			)
+		}
+
+		if num.Kind() != jsontext.KindNumber {
+			t.Fatalf(
+				"expected filter_task_id to be JSON number, got kind %v",
+				num.Kind(),
+			)
 		}
 
 		if num.String() != "1234567890123456789" {
-			t.Fatalf("unexpected filter_task_id: got %q", num.String())
+			t.Fatalf(
+				"unexpected filter_task_id: got %q",
+				num.String(),
+			)
 		}
 	})
 

@@ -1,7 +1,7 @@
 package download
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"strings"
 
@@ -113,10 +113,19 @@ func reqLanguageMapping(
 	}
 }
 
-func parseLanguageMapping(raw string) ([]map[string]any, error) {
-	var out []map[string]any
+type languageMapping struct {
+	OriginalLanguageISO string `json:"original_language_iso"`
+	CustomLanguageISO   string `json:"custom_language_iso"`
+}
 
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+func parseLanguageMapping(raw string) ([]languageMapping, error) {
+	var out []languageMapping
+
+	if err := json.Unmarshal(
+		[]byte(raw),
+		&out,
+		json.RejectUnknownMembers(true),
+	); err != nil {
 		return nil, err
 	}
 

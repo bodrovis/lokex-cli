@@ -2,6 +2,7 @@ package download
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -232,9 +233,13 @@ func TestBuildParams_LanguageMapping(t *testing.T) {
 		t.Parallel()
 
 		cmd := newTestCommand()
+
 		flags := &Flags{
-			Format:              "json",
-			LanguageMappingJSON: `[{"lang_iso":"en","custom_iso":"en_US"}]`,
+			Format: "json",
+			LanguageMappingJSON: `[{
+				"original_language_iso":"en",
+				"custom_language_iso":"en_US"
+			}]`,
 		}
 
 		params, err := buildParams(cmd, flags, nil)
@@ -247,15 +252,27 @@ func TestBuildParams_LanguageMapping(t *testing.T) {
 			t.Fatal("expected language_mapping to be set")
 		}
 
-		want := []map[string]any{
+		gotMappings, ok := got.([]languageMapping)
+		if !ok {
+			t.Fatalf(
+				"language_mapping type = %T, want []languageMapping",
+				got,
+			)
+		}
+
+		want := []languageMapping{
 			{
-				"lang_iso":   "en",
-				"custom_iso": "en_US",
+				OriginalLanguageISO: "en",
+				CustomLanguageISO:   "en_US",
 			},
 		}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("unexpected language_mapping: got %#v, want %#v", got, want)
+		if !slices.Equal(gotMappings, want) {
+			t.Fatalf(
+				"unexpected language_mapping: got %#v, want %#v",
+				gotMappings,
+				want,
+			)
 		}
 	})
 
@@ -263,6 +280,7 @@ func TestBuildParams_LanguageMapping(t *testing.T) {
 		t.Parallel()
 
 		cmd := newTestCommand()
+
 		flags := &Flags{
 			Format:              "json",
 			LanguageMappingJSON: `not-json`,
@@ -281,22 +299,29 @@ func TestParseLanguageMapping(t *testing.T) {
 	t.Run("parses valid json", func(t *testing.T) {
 		t.Parallel()
 
-		raw := `[{"lang_iso":"en","custom_iso":"en_US"}]`
+		raw := `[{
+			"original_language_iso":"en",
+			"custom_language_iso":"en_US"
+		}]`
 
 		got, err := parseLanguageMapping(raw)
 		if err != nil {
 			t.Fatalf("parseLanguageMapping() error = %v", err)
 		}
 
-		want := []map[string]any{
+		want := []languageMapping{
 			{
-				"lang_iso":   "en",
-				"custom_iso": "en_US",
+				OriginalLanguageISO: "en",
+				CustomLanguageISO:   "en_US",
 			},
 		}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("unexpected parsed mapping: got %#v, want %#v", got, want)
+		if !slices.Equal(got, want) {
+			t.Fatalf(
+				"unexpected parsed mapping: got %#v, want %#v",
+				got,
+				want,
+			)
 		}
 	})
 
@@ -306,6 +331,17 @@ func TestParseLanguageMapping(t *testing.T) {
 		_, err := parseLanguageMapping(`{`)
 		if err == nil {
 			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("rejects unknown fields", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := parseLanguageMapping(
+			`[{"lang_iso":"en","custom_iso":"en_US"}]`,
+		)
+		if err == nil {
+			t.Fatal("expected error for unknown fields, got nil")
 		}
 	})
 }
