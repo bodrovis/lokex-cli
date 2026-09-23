@@ -1,203 +1,156 @@
 package download
 
 import (
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/bodrovis/lokex-cli/internal/params"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 )
 
-func TestLoadDownloadConfig_IgnoresMissingImplicitConfig(t *testing.T) {
-	cfg := &DownloadConfig{}
+func TestLoadDownloadConfig_DefaultsAndConfig(t *testing.T) {
+	v := viper.New()
 
-	err := LoadDownloadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error for missing implicit config, got %v", err)
-	}
-}
+	v.Set("download.format", "json")
+	v.Set("download.async", true)
 
-func TestLoadDownloadConfig_ReturnsErrorForMissingExplicitConfig(t *testing.T) {
-	cfg := &DownloadConfig{}
-
-	err := LoadDownloadConfig(cfg, filepath.Join(t.TempDir(), "missing.yaml"), "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for missing explicit config")
-	}
-}
-
-func TestLoadDownloadConfig_ReturnsErrorWhenConfigIsNil(t *testing.T) {
-	err := LoadDownloadConfig(nil, "", "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for nil download config")
-	}
-
-	if !strings.Contains(err.Error(), "download config is nil") {
-		t.Fatalf("expected nil config error, got %v", err)
-	}
-}
-
-func TestLoadDownloadConfig_ReturnsErrorForInvalidExplicitConfig(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "broken.yaml")
-	if err := os.WriteFile(configFile, []byte(":\nbad yaml"), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+	cmd := newTestDownloadCommand()
 
 	cfg := &DownloadConfig{}
 
-	err := LoadDownloadConfig(cfg, configFile, "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for invalid explicit config")
-	}
+	err := LoadDownloadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	require.NotNil(t, cfg.Out)
+	require.Equal(t, "./locales", *cfg.Out)
+
+	require.NotNil(t, cfg.Format)
+	require.Equal(t, "json", *cfg.Format)
+
+	require.NotNil(t, cfg.Async)
+	require.True(t, *cfg.Async)
 }
 
-func TestLoadDownloadConfig_LoadsValuesFromConfigFile(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "lokex.yaml")
-	content := `
-download:
-  out: ./tmp/out
-  format: json
-  async: true
-  original-filenames: true
-  filter-langs:
-    - en
-    - fr
-  filter-task-id: 123
-`
-	if err := os.WriteFile(configFile, []byte(strings.TrimSpace(content)), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+func TestLoadDownloadConfig_FlagsOverrideConfig(t *testing.T) {
+	v := viper.New()
+
+	v.Set("download.format", "json")
+	v.Set("download.out", "./from-config")
+	v.Set("download.async", true)
+
+	cmd := newTestDownloadCommand()
+
+	require.NoError(
+		t,
+		cmd.ParseFlags([]string{
+			"--format=xml",
+			"--out=./from-cli",
+			"--async=false",
+		}),
+	)
 
 	cfg := &DownloadConfig{}
 
-	err := LoadDownloadConfig(cfg, configFile, "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	err := LoadDownloadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, "xml", *cfg.Format)
+	require.Equal(t, "./from-cli", *cfg.Out)
+	require.False(t, *cfg.Async)
+}
+
+func TestLoadDownloadConfig_NilArguments(t *testing.T) {
+	tests := []struct {
+		name    string
+		v       *viper.Viper
+		cmd     *cobra.Command
+		cfg     *DownloadConfig
+		wantErr string
+	}{
+		{
+			name:    "nil viper",
+			v:       nil,
+			cmd:     newTestDownloadCommand(),
+			cfg:     &DownloadConfig{},
+			wantErr: "viper is nil",
+		},
+		{
+			name:    "nil command",
+			v:       viper.New(),
+			cmd:     nil,
+			cfg:     &DownloadConfig{},
+			wantErr: "download command is nil",
+		},
+		{
+			name:    "nil config",
+			v:       viper.New(),
+			cmd:     newTestDownloadCommand(),
+			cfg:     nil,
+			wantErr: "download config is nil",
+		},
 	}
 
-	if cfg.Out == nil || *cfg.Out != "./tmp/out" {
-		t.Fatalf("expected Out to be loaded from config, got %#v", cfg.Out)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := LoadDownloadConfig(
+				tt.v,
+				tt.cmd,
+				tt.cfg,
+			)
 
-	if cfg.Format == nil || *cfg.Format != "json" {
-		t.Fatalf("expected Format to be loaded from config, got %#v", cfg.Format)
-	}
-
-	if cfg.Async == nil || *cfg.Async != true {
-		t.Fatalf("expected Async to be true, got %#v", cfg.Async)
-	}
-
-	if cfg.OriginalFilenames == nil || *cfg.OriginalFilenames != true {
-		t.Fatalf("expected OriginalFilenames to be true, got %#v", cfg.OriginalFilenames)
-	}
-
-	wantLangs := []string{"en", "fr"}
-	if cfg.FilterLangs == nil || !reflect.DeepEqual(*cfg.FilterLangs, wantLangs) {
-		t.Fatalf("expected FilterLangs %v, got %#v", wantLangs, cfg.FilterLangs)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 123 {
-		t.Fatalf("expected FilterTaskID to be 123, got %#v", cfg.FilterTaskID)
+			require.EqualError(
+				t,
+				err,
+				tt.wantErr,
+			)
+		})
 	}
 }
 
-func TestLoadDownloadConfig_LoadsValuesFromEnv(t *testing.T) {
-	t.Setenv("LOKEX_DOWNLOAD_OUT", "./env-out")
-	t.Setenv("LOKEX_DOWNLOAD_FORMAT", "xml")
-	t.Setenv("LOKEX_DOWNLOAD_ASYNC", "true")
-	t.Setenv("LOKEX_DOWNLOAD_ORIGINAL_FILENAMES", "true")
-	t.Setenv("LOKEX_DOWNLOAD_FILTER_LANGS", "de, es")
-	t.Setenv("LOKEX_DOWNLOAD_FILTER_TASK_ID", "987")
+func TestLoadDownloadConfig_ReturnsDecodeError(t *testing.T) {
+	v := viper.New()
+
+	v.Set(
+		"download.filter-task-id",
+		"not-an-int64",
+	)
+
+	cmd := newTestDownloadCommand()
 
 	cfg := &DownloadConfig{}
 
-	err := LoadDownloadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	err := LoadDownloadConfig(
+		v,
+		cmd,
+		cfg,
+	)
 
-	if cfg.Out == nil || *cfg.Out != "./env-out" {
-		t.Fatalf("expected Out to be loaded from env, got %#v", cfg.Out)
-	}
-
-	if cfg.Format == nil || *cfg.Format != "xml" {
-		t.Fatalf("expected Format to be loaded from env, got %#v", cfg.Format)
-	}
-
-	if cfg.Async == nil || *cfg.Async != true {
-		t.Fatalf("expected Async to be true, got %#v", cfg.Async)
-	}
-
-	if cfg.OriginalFilenames == nil || *cfg.OriginalFilenames != true {
-		t.Fatalf("expected OriginalFilenames to be true, got %#v", cfg.OriginalFilenames)
-	}
-
-	wantLangs := []string{"de", "es"}
-	if cfg.FilterLangs == nil || !reflect.DeepEqual(*cfg.FilterLangs, wantLangs) {
-		t.Fatalf("expected FilterLangs %v, got %#v", wantLangs, cfg.FilterLangs)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 987 {
-		t.Fatalf("expected FilterTaskID to be 987, got %#v", cfg.FilterTaskID)
-	}
+	require.Error(t, err)
+	require.Contains(
+		t,
+		err.Error(),
+		"decode download config:",
+	)
 }
 
-func TestLoadDownloadConfig_EnvOverridesConfigFile(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "lokex.yaml")
-	content := `
-download:
-  format: json
-  async: false
-  filter-langs:
-    - en
-    - fr
-  filter-task-id: 111
-`
-	if err := os.WriteFile(configFile, []byte(strings.TrimSpace(content)), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
+func newTestDownloadCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "download",
 	}
 
-	t.Setenv("LOKEX_DOWNLOAD_FORMAT", "xml")
-	t.Setenv("LOKEX_DOWNLOAD_ASYNC", "true")
-	t.Setenv("LOKEX_DOWNLOAD_FILTER_LANGS", "de,es")
-	t.Setenv("LOKEX_DOWNLOAD_FILTER_TASK_ID", "222")
+	params.BindFlags(
+		cmd,
+		downloadParamSpecs,
+	)
 
-	cfg := &DownloadConfig{}
-
-	err := LoadDownloadConfig(cfg, configFile, "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if cfg.Format == nil || *cfg.Format != "xml" {
-		t.Fatalf("expected env to override config for Format, got %#v", cfg.Format)
-	}
-
-	if cfg.Async == nil || *cfg.Async != true {
-		t.Fatalf("expected env to override config for Async, got %#v", cfg.Async)
-	}
-
-	wantLangs := []string{"de", "es"}
-	if cfg.FilterLangs == nil || !reflect.DeepEqual(*cfg.FilterLangs, wantLangs) {
-		t.Fatalf("expected env to override config for FilterLangs, got %#v", cfg.FilterLangs)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 222 {
-		t.Fatalf("expected env to override config for FilterTaskID, got %#v", cfg.FilterTaskID)
-	}
-}
-
-func TestLoadDownloadConfig_EmptyStringSliceEnvDoesNotSetField(t *testing.T) {
-	t.Setenv("LOKEX_DOWNLOAD_FILTER_LANGS", " , ,  , ")
-
-	cfg := &DownloadConfig{}
-
-	err := LoadDownloadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if cfg.FilterLangs != nil {
-		t.Fatalf("expected FilterLangs to stay nil, got %#v", cfg.FilterLangs)
-	}
+	return cmd
 }

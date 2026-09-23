@@ -17,21 +17,42 @@ func (cfg *GlobalConfig) NewClient() (*lokexclient.Client, error) {
 	if baseURL != "" {
 		opts = append(opts, lokexclient.WithBaseURL(baseURL))
 	}
+
 	if userAgent != "" {
 		opts = append(opts, lokexclient.WithUserAgent(userAgent))
 	}
+
 	if cfg.HTTPTimeout != 0 {
 		opts = append(opts, lokexclient.WithHTTPTimeout(cfg.HTTPTimeout))
 	}
+
 	if cfg.MaxRetries >= 0 {
 		opts = append(opts, lokexclient.WithMaxRetries(cfg.MaxRetries))
 	}
+
 	if cfg.InitialBackoff != 0 || cfg.MaxBackoff != 0 {
-		opts = append(opts, lokexclient.WithBackoff(cfg.InitialBackoff, cfg.MaxBackoff))
-	}
-	if cfg.PollInitialWait != 0 || cfg.PollMaxWait != 0 {
-		opts = append(opts, lokexclient.WithPollWait(cfg.PollInitialWait, cfg.PollMaxWait))
+		opts = append(
+			opts,
+			lokexclient.WithBackoff(
+				cfg.InitialBackoff,
+				cfg.MaxBackoff,
+			),
+		)
 	}
 
-	return lokexclient.NewClient(token, projectID, opts...)
+	if cfg.PollInitialWait != 0 || cfg.PollMaxWait != 0 {
+		opts = append(
+			opts,
+			lokexclient.WithPollWait(
+				cfg.PollInitialWait,
+				cfg.PollMaxWait,
+			),
+		)
+	}
+
+	return lokexclient.NewClient(
+		token,
+		projectID,
+		opts...,
+	)
 }

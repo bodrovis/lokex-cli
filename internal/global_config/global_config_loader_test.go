@@ -6,64 +6,73 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bodrovis/lokex-cli/internal/viper_helpers"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadGlobalConfigInput_ConfigOnly(t *testing.T) {
+func TestLoadGlobalConfig_ConfigOnly(t *testing.T) {
 	dir := t.TempDir()
 	cfgFile := filepath.Join(dir, "lokex.yaml")
 
-	err := os.WriteFile(cfgFile, []byte(`
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
 token: file-token
 project-id: file-project
 http-timeout: 45s
 retries: 2
 context-timeout: 100s
 base-url: https://example.com
-`), 0o644)
-	require.NoError(t, err)
+`), 0o644))
 
-	input, err := LoadGlobalConfigInput("lokex-cli/test", LoadOptions{
-		ConfigFile: cfgFile,
-		EnvPrefix:  "LOKEX",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, input)
+	const userAgent = "lokex-cli/test"
 
-	require.NotNil(t, input.Token)
-	require.Equal(t, "file-token", *input.Token)
+	v := newTestConfigViper(t, cfgFile)
+	cmd := newTestCommand(t, userAgent)
 
-	require.NotNil(t, input.ProjectID)
-	require.Equal(t, "file-project", *input.ProjectID)
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
 
-	require.NotNil(t, input.HTTPTimeout)
-	require.Equal(t, 45*time.Second, *input.HTTPTimeout)
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
 
-	require.NotNil(t, input.ContextTimeout)
-	require.Equal(t, 100*time.Second, *input.ContextTimeout)
-
-	require.NotNil(t, input.MaxRetries)
-	require.Equal(t, 2, *input.MaxRetries)
-
-	require.NotNil(t, input.BaseURL)
-	require.Equal(t, "https://example.com", *input.BaseURL)
+	require.Equal(t, "file-token", cfg.Token)
+	require.Equal(t, "file-project", cfg.ProjectID)
+	require.Equal(t, 45*time.Second, cfg.HTTPTimeout)
+	require.Equal(t, 100*time.Second, cfg.ContextTimeout)
+	require.Equal(t, 2, cfg.MaxRetries)
+	require.Equal(t, "https://example.com", cfg.BaseURL)
+	require.Equal(t, userAgent, cfg.UserAgent)
 }
 
-func TestLoadGlobalConfigInput_NoConfigFile(t *testing.T) {
-	input, err := LoadGlobalConfigInput("lokex-cli/test", LoadOptions{
-		ConfigFile: "",
-		EnvPrefix:  "LOKEX",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, input)
+func TestLoadGlobalConfig_NoConfigFile(t *testing.T) {
+	const userAgent = "lokex-cli/test"
+
+	v := newTestConfigViper(t, "")
+	cmd := newTestCommand(t, userAgent)
+
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	require.Equal(t, userAgent, cfg.UserAgent)
+	require.Equal(t, -1, cfg.MaxRetries)
+	require.Equal(t, 150*time.Second, cfg.ContextTimeout)
 }
 
-func TestLoadGlobalConfigInput_ConfigCanSetZeroValues(t *testing.T) {
+func TestLoadGlobalConfig_ConfigCanSetZeroValues(t *testing.T) {
 	dir := t.TempDir()
 	cfgFile := filepath.Join(dir, "lokex.yaml")
 
-	err := os.WriteFile(cfgFile, []byte(`
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
 token: file-token
 project-id: file-project
 http-timeout: 0s
@@ -73,120 +82,21 @@ backoff-max: 0s
 poll-initial-wait: 0s
 poll-max-wait: 0s
 context-timeout: 0s
-`), 0o644)
-	require.NoError(t, err)
+`), 0o644))
 
-	input, err := LoadGlobalConfigInput("lokex-cli/test", LoadOptions{
-		ConfigFile: cfgFile,
-		EnvPrefix:  "LOKEX",
-	})
-	require.NoError(t, err)
+	const userAgent = "lokex-cli/test"
 
-	require.Equal(t, time.Duration(0), *input.HTTPTimeout)
-	require.Equal(t, time.Duration(0), *input.ContextTimeout)
-	require.Equal(t, -1, *input.MaxRetries)
-	require.Equal(t, time.Duration(0), *input.InitialBackoff)
-	require.Equal(t, time.Duration(0), *input.MaxBackoff)
-	require.Equal(t, time.Duration(0), *input.PollInitialWait)
-	require.Equal(t, time.Duration(0), *input.PollMaxWait)
-}
+	v := newTestConfigViper(t, cfgFile)
+	cmd := newTestCommand(t, userAgent)
 
-func TestApplyGlobalInput_FlagsOverrideInput(t *testing.T) {
 	cfg := &GlobalConfig{
-		UserAgent: "lokex-cli/test",
+		UserAgent: userAgent,
 	}
 
-	cmd := &cobra.Command{Use: "test"}
-	BindPersistentFlags(cmd.PersistentFlags(), cfg)
-
-	err := cmd.ParseFlags([]string{
-		"--token=cli-token",
-	})
-	require.NoError(t, err)
-
-	projectID := "file-project"
-	timeout := 30 * time.Second
-	retries := 2
-	token := "file-token"
-	contextTimeout := 60 * time.Second
-	baseUrl := "https://example.com"
-
-	input := &GlobalConfigInput{
-		Token:          &token,
-		ProjectID:      &projectID,
-		HTTPTimeout:    &timeout,
-		MaxRetries:     &retries,
-		ContextTimeout: &contextTimeout,
-		BaseURL:        &baseUrl,
-	}
-
-	ApplyGlobalInput(cmd, cfg, input)
-
-	require.Equal(t, "cli-token", cfg.Token)
-	require.Equal(t, "file-project", cfg.ProjectID)
-	require.Equal(t, 30*time.Second, cfg.HTTPTimeout)
-	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
-	require.Equal(t, 2, cfg.MaxRetries)
-	require.Equal(t, "https://example.com", cfg.BaseURL)
-}
-
-func TestApplyGlobalInput_InputOnly(t *testing.T) {
-	cfg := &GlobalConfig{
-		UserAgent: "lokex-cli/test",
-	}
-
-	cmd := &cobra.Command{Use: "test"}
-	BindPersistentFlags(cmd.PersistentFlags(), cfg)
-
-	token := "file-token"
-	projectID := "file-project"
-	timeout := 45 * time.Second
-	contextTimeout := 60 * time.Second
-
-	input := &GlobalConfigInput{
-		Token:          &token,
-		ProjectID:      &projectID,
-		HTTPTimeout:    &timeout,
-		ContextTimeout: &contextTimeout,
-	}
-
-	ApplyGlobalInput(cmd, cfg, input)
-
-	require.Equal(t, "file-token", cfg.Token)
-	require.Equal(t, "file-project", cfg.ProjectID)
-	require.Equal(t, 45*time.Second, cfg.HTTPTimeout)
-	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
-}
-
-func TestApplyGlobalInput_InputCanSetZeroValues(t *testing.T) {
-	cfg := &GlobalConfig{
-		UserAgent:       "lokex-cli/test",
-		HTTPTimeout:     10 * time.Second,
-		MaxRetries:      5,
-		InitialBackoff:  1 * time.Second,
-		MaxBackoff:      2 * time.Second,
-		PollInitialWait: 3 * time.Second,
-		PollMaxWait:     4 * time.Second,
-		ContextTimeout:  5 * time.Second,
-	}
-
-	cmd := &cobra.Command{Use: "test"}
-	BindPersistentFlags(cmd.PersistentFlags(), cfg)
-
-	zeroDuration := time.Duration(0)
-	minusOne := -1
-
-	input := &GlobalConfigInput{
-		HTTPTimeout:     &zeroDuration,
-		MaxRetries:      &minusOne,
-		InitialBackoff:  &zeroDuration,
-		MaxBackoff:      &zeroDuration,
-		PollInitialWait: &zeroDuration,
-		PollMaxWait:     &zeroDuration,
-		ContextTimeout:  &zeroDuration,
-	}
-
-	ApplyGlobalInput(cmd, cfg, input)
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
 
 	require.Equal(t, time.Duration(0), cfg.HTTPTimeout)
 	require.Equal(t, -1, cfg.MaxRetries)
@@ -197,25 +107,320 @@ func TestApplyGlobalInput_InputCanSetZeroValues(t *testing.T) {
 	require.Equal(t, time.Duration(0), cfg.ContextTimeout)
 }
 
-func TestApplyGlobalInput_FlagOverridesExplicitZeroFromInput(t *testing.T) {
+func TestLoadGlobalConfig_FlagsOverrideConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "lokex.yaml")
+
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
+token: file-token
+project-id: file-project
+http-timeout: 30s
+retries: 2
+context-timeout: 60s
+base-url: https://example.com
+`), 0o644))
+
+	const userAgent = "lokex-cli/test"
+
+	v := newTestConfigViper(t, cfgFile)
+
+	cmd := newTestCommand(
+		t,
+		userAgent,
+		"--token=cli-token",
+	)
+
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	require.Equal(t, "cli-token", cfg.Token)
+	require.Equal(t, "file-project", cfg.ProjectID)
+	require.Equal(t, 30*time.Second, cfg.HTTPTimeout)
+	require.Equal(t, 2, cfg.MaxRetries)
+	require.Equal(t, 60*time.Second, cfg.ContextTimeout)
+	require.Equal(t, "https://example.com", cfg.BaseURL)
+}
+
+func TestLoadGlobalConfig_FlagOverridesExplicitZeroFromConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "lokex.yaml")
+
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
+http-timeout: 0s
+`), 0o644))
+
+	const userAgent = "lokex-cli/test"
+
+	v := newTestConfigViper(t, cfgFile)
+
+	cmd := newTestCommand(
+		t,
+		userAgent,
+		"--http-timeout=20s",
+	)
+
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	require.Equal(t, 20*time.Second, cfg.HTTPTimeout)
+}
+
+func TestLoadGlobalConfig_EnvOverridesConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "lokex.yaml")
+
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
+token: file-token
+project-id: file-project
+http-timeout: 10s
+`), 0o644))
+
+	t.Setenv("LOKEX_TOKEN", "env-token")
+	t.Setenv("LOKEX_HTTP_TIMEOUT", "20s")
+
+	const userAgent = "lokex-cli/test"
+
+	v := newTestConfigViper(t, cfgFile)
+	cmd := newTestCommand(t, userAgent)
+
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	require.Equal(t, "env-token", cfg.Token)
+	require.Equal(t, "file-project", cfg.ProjectID)
+	require.Equal(t, 20*time.Second, cfg.HTTPTimeout)
+}
+
+func TestLoadGlobalConfig_Precedence(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "lokex.yaml")
+
+	require.NoError(t, os.WriteFile(cfgFile, []byte(`
+token: file-token
+project-id: file-project
+http-timeout: 10s
+context-timeout: 90s
+`), 0o644))
+
+	t.Setenv("LOKEX_TOKEN", "env-token")
+	t.Setenv("LOKEX_HTTP_TIMEOUT", "20s")
+
+	const userAgent = "lokex-cli/test"
+
+	v := newTestConfigViper(t, cfgFile)
+
+	cmd := newTestCommand(
+		t,
+		userAgent,
+		"--token=cli-token",
+	)
+
+	cfg := &GlobalConfig{
+		UserAgent: userAgent,
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	// CLI > env > config > default.
+	require.Equal(t, "cli-token", cfg.Token)
+	require.Equal(t, 20*time.Second, cfg.HTTPTimeout)
+	require.Equal(t, "file-project", cfg.ProjectID)
+	require.Equal(t, 90*time.Second, cfg.ContextTimeout)
+
+	// Not provided anywhere: declared default.
+	require.Equal(t, -1, cfg.MaxRetries)
+}
+
+func TestLoadGlobalConfig_Errors(t *testing.T) {
+	t.Run("nil viper", func(t *testing.T) {
+		cmd := &cobra.Command{Use: "test"}
+		cfg := &GlobalConfig{}
+
+		err := LoadGlobalConfig(nil, cmd, cfg)
+
+		require.EqualError(t, err, "viper is nil")
+	})
+
+	t.Run("nil command", func(t *testing.T) {
+		v := viper.New()
+		cfg := &GlobalConfig{}
+
+		err := LoadGlobalConfig(v, nil, cfg)
+
+		require.EqualError(t, err, "command is nil")
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		v := viper.New()
+		cmd := &cobra.Command{Use: "test"}
+
+		err := LoadGlobalConfig(v, cmd, nil)
+
+		require.EqualError(t, err, "global config is nil")
+	})
+}
+
+func TestLoadGlobalConfig_ReturnsApplyChangedFlagsError(t *testing.T) {
+	v := viper.New()
+
+	cmd := &cobra.Command{
+		Use: "test",
+	}
+
+	cmd.Flags().Int(
+		"token",
+		0,
+		"wrong type on purpose",
+	)
+
+	require.NoError(
+		t,
+		cmd.Flags().Set("token", "123"),
+	)
+
 	cfg := &GlobalConfig{
 		UserAgent: "lokex-cli/test",
 	}
 
-	cmd := &cobra.Command{Use: "test"}
-	BindPersistentFlags(cmd.PersistentFlags(), cfg)
+	err := LoadGlobalConfig(
+		v,
+		cmd,
+		cfg,
+	)
 
-	err := cmd.ParseFlags([]string{
-		"--http-timeout=20s",
-	})
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Contains(
+		t,
+		err.Error(),
+		"apply global flags:",
+	)
+}
 
-	zeroDuration := time.Duration(0)
-	input := &GlobalConfigInput{
-		HTTPTimeout: &zeroDuration,
+func TestLoadGlobalConfig_ReturnsDecodeError(t *testing.T) {
+	v := viper.New()
+
+	v.Set(
+		"retries",
+		"definitely-not-an-int",
+	)
+
+	cmd := newTestCommand(
+		t,
+		"lokex-cli/test",
+	)
+
+	cfg := &GlobalConfig{
+		UserAgent: "lokex-cli/test",
 	}
 
-	ApplyGlobalInput(cmd, cfg, input)
+	err := LoadGlobalConfig(
+		v,
+		cmd,
+		cfg,
+	)
 
-	require.Equal(t, 20*time.Second, cfg.HTTPTimeout)
+	require.Error(t, err)
+	require.Contains(
+		t,
+		err.Error(),
+		"decode global config:",
+	)
+}
+
+func TestLoadGlobalConfig_DoesNotValidateResolvedConfig(t *testing.T) {
+	v := viper.New()
+
+	v.Set("token", "token")
+	v.Set("project-id", "project-id")
+	v.Set("http-timeout", "-1s")
+
+	cmd := newTestCommand(
+		t,
+		"lokex-cli/test",
+	)
+
+	cfg := &GlobalConfig{
+		UserAgent: "lokex-cli/test",
+	}
+
+	require.NoError(
+		t,
+		LoadGlobalConfig(v, cmd, cfg),
+	)
+
+	require.Equal(
+		t,
+		-time.Second,
+		cfg.HTTPTimeout,
+	)
+
+	require.EqualError(
+		t,
+		cfg.Validate(),
+		"http-timeout must be >= 0",
+	)
+}
+
+func newTestConfigViper(
+	t *testing.T,
+	configFile string,
+) *viper.Viper {
+	t.Helper()
+
+	v := viper_helpers.NewConfigViper(
+		configFile,
+		"LOKEX",
+	)
+
+	require.NoError(
+		t,
+		viper_helpers.ReadOptionalConfig(v, configFile),
+	)
+
+	return v
+}
+
+func newTestCommand(
+	t *testing.T,
+	userAgent string,
+	args ...string,
+) *cobra.Command {
+	t.Helper()
+
+	cmd := &cobra.Command{
+		Use: "test",
+	}
+
+	BindPersistentFlags(
+		cmd.PersistentFlags(),
+		userAgent,
+	)
+
+	require.NoError(
+		t,
+		cmd.ParseFlags(args),
+	)
+
+	return cmd
 }

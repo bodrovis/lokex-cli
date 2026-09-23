@@ -3,80 +3,89 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateDocs_CreatesMarkdownFiles(t *testing.T) {
-	root := RootCmd()
-	dir := t.TempDir()
-
-	if err := generateDocs(root, dir); err != nil {
-		t.Fatalf("generateDocs() returned error: %v", err)
+func TestNewGenDocsCmd(t *testing.T) {
+	root := &cobra.Command{
+		Use: "lokex",
 	}
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("failed to read docs dir: %v", err)
-	}
+	cmd := newGenDocsCmd(root)
 
-	if len(entries) == 0 {
-		t.Fatal("expected generated docs, but directory is empty")
-	}
-
-	var foundRootDoc bool
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		if strings.HasSuffix(entry.Name(), ".md") {
-			foundRootDoc = true
-			break
-		}
-	}
-
-	if !foundRootDoc {
-		t.Fatal("expected at least one markdown file to be generated")
-	}
+	require.NotNil(t, cmd)
+	require.Equal(t, "gendocs", cmd.Use)
+	require.True(t, cmd.Hidden)
+	require.NotNil(t, cmd.RunE)
 }
 
-func TestGenDocsCmd_Execute_CreatesDocsDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	oldWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get working directory: %v", err)
+func TestGenerateDocs(t *testing.T) {
+	root := &cobra.Command{
+		Use:   "lokex",
+		Short: "Test CLI",
 	}
 
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to chdir to temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(oldWD)
+	root.AddCommand(&cobra.Command{
+		Use:   "upload",
+		Short: "Upload files",
+		Run: func(*cobra.Command, []string) {
+		},
 	})
 
-	root := RootCmd()
-	root.SetArgs([]string{"gendocs"})
+	dir := filepath.Join(
+		t.TempDir(),
+		"docs",
+	)
 
-	if err := root.Execute(); err != nil {
-		t.Fatalf("root.Execute() returned error: %v", err)
+	err := generateDocs(root, dir)
+	require.NoError(t, err)
+
+	require.DirExists(t, dir)
+
+	require.FileExists(
+		t,
+		filepath.Join(dir, "lokex.md"),
+	)
+
+	require.FileExists(
+		t,
+		filepath.Join(dir, "lokex_upload.md"),
+	)
+}
+
+func TestGenerateDocs_ReturnsMkdirError(t *testing.T) {
+	dir := t.TempDir()
+
+	file := filepath.Join(
+		dir,
+		"not-a-directory",
+	)
+
+	require.NoError(
+		t,
+		os.WriteFile(
+			file,
+			[]byte("hello"),
+			0o644,
+		),
+	)
+
+	target := filepath.Join(
+		file,
+		"docs",
+	)
+
+	root := &cobra.Command{
+		Use: "lokex",
 	}
 
-	docsDir := filepath.Join(tmpDir, "docs")
-	info, err := os.Stat(docsDir)
-	if err != nil {
-		t.Fatalf("expected docs directory to exist: %v", err)
-	}
-	if !info.IsDir() {
-		t.Fatalf("expected %q to be a directory", docsDir)
-	}
+	err := generateDocs(
+		root,
+		target,
+	)
 
-	entries, err := os.ReadDir(docsDir)
-	if err != nil {
-		t.Fatalf("failed to read generated docs dir: %v", err)
-	}
-	if len(entries) == 0 {
-		t.Fatal("expected generated docs files, but docs directory is empty")
-	}
+	require.Error(t, err)
 }

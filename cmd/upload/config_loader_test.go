@@ -1,236 +1,188 @@
 package upload
 
 import (
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/bodrovis/lokex-cli/internal/params"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 )
 
-func TestLoadUploadConfig_IgnoresMissingImplicitConfig(t *testing.T) {
-	cfg := &UploadConfig{}
+func TestLoadUploadConfig_ConfigValues(t *testing.T) {
+	v := viper.New()
 
-	err := LoadUploadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error for missing implicit config, got %v", err)
-	}
-}
+	v.Set("upload.filename", "en.json")
+	v.Set("upload.lang-iso", "en")
+	v.Set("upload.poll", true)
+	v.Set("upload.apply-tm", true)
 
-func TestLoadUploadConfig_ReturnsErrorWhenConfigIsNil(t *testing.T) {
-	err := LoadUploadConfig(nil, "", "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for nil upload config")
-	}
-
-	if !strings.Contains(err.Error(), "upload config is nil") {
-		t.Fatalf("expected nil config error, got %v", err)
-	}
-}
-
-func TestLoadUploadConfig_ReturnsErrorForMissingExplicitConfig(t *testing.T) {
-	cfg := &UploadConfig{}
-
-	err := LoadUploadConfig(cfg, filepath.Join(t.TempDir(), "missing.yaml"), "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for missing explicit config")
-	}
-}
-
-func TestLoadUploadConfig_ReturnsErrorForInvalidExplicitConfig(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "broken.yaml")
-	if err := os.WriteFile(configFile, []byte(":\nbad yaml"), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+	cmd := newTestUploadCommand()
 
 	cfg := &UploadConfig{}
 
-	err := LoadUploadConfig(cfg, configFile, "LOKEX")
-	if err == nil {
-		t.Fatal("expected error for invalid explicit config")
-	}
+	err := LoadUploadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	require.NotNil(t, cfg.Filename)
+	require.Equal(t, "en.json", *cfg.Filename)
+
+	require.NotNil(t, cfg.LangISO)
+	require.Equal(t, "en", *cfg.LangISO)
+
+	require.NotNil(t, cfg.Poll)
+	require.True(t, *cfg.Poll)
+
+	require.NotNil(t, cfg.ApplyTM)
+	require.True(t, *cfg.ApplyTM)
 }
 
-func TestLoadUploadConfig_LoadsValuesFromConfigFile(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "lokex.yaml")
-	content := `
-upload:
-  filename: messages.json
-  src-path: ./locales/messages.json
-  lang-iso: en
-  poll: true
-  format: json
-  tags:
-    - mobile
-    - backend
-  convert-placeholders: true
-  filter-task-id: 123
-`
-	if err := os.WriteFile(configFile, []byte(strings.TrimSpace(content)), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+func TestLoadUploadConfig_FlagsOverrideConfig(t *testing.T) {
+	v := viper.New()
+
+	v.Set("upload.filename", "default.json")
+	v.Set("upload.lang-iso", "fr")
+	v.Set("upload.poll", true)
+	v.Set("upload.apply-tm", true)
+
+	cmd := newTestUploadCommand()
+
+	require.NoError(
+		t,
+		cmd.ParseFlags([]string{
+			"--filename=explicit.json",
+			"--lang-iso=en",
+			"--poll=false",
+			"--apply-tm=false",
+		}),
+	)
 
 	cfg := &UploadConfig{}
 
-	err := LoadUploadConfig(cfg, configFile, "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	err := LoadUploadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, "explicit.json", *cfg.Filename)
+	require.Equal(t, "en", *cfg.LangISO)
+
+	require.NotNil(t, cfg.Poll)
+	require.False(t, *cfg.Poll)
+
+	require.NotNil(t, cfg.ApplyTM)
+	require.False(t, *cfg.ApplyTM)
+}
+
+func TestLoadUploadConfig_NilArguments(t *testing.T) {
+	tests := []struct {
+		name    string
+		v       *viper.Viper
+		cmd     *cobra.Command
+		cfg     *UploadConfig
+		wantErr string
+	}{
+		{
+			name:    "nil viper",
+			v:       nil,
+			cmd:     newTestUploadCommand(),
+			cfg:     &UploadConfig{},
+			wantErr: "viper is nil",
+		},
+		{
+			name:    "nil command",
+			v:       viper.New(),
+			cmd:     nil,
+			cfg:     &UploadConfig{},
+			wantErr: "upload command is nil",
+		},
+		{
+			name:    "nil config",
+			v:       viper.New(),
+			cmd:     newTestUploadCommand(),
+			cfg:     nil,
+			wantErr: "upload config is nil",
+		},
 	}
 
-	if cfg.Filename == nil || *cfg.Filename != "messages.json" {
-		t.Fatalf("expected Filename to be loaded from config, got %#v", cfg.Filename)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := LoadUploadConfig(
+				tt.v,
+				tt.cmd,
+				tt.cfg,
+			)
 
-	if cfg.SrcPath == nil || *cfg.SrcPath != "./locales/messages.json" {
-		t.Fatalf("expected SrcPath to be loaded from config, got %#v", cfg.SrcPath)
-	}
-
-	if cfg.LangISO == nil || *cfg.LangISO != "en" {
-		t.Fatalf("expected LangISO to be loaded from config, got %#v", cfg.LangISO)
-	}
-
-	if cfg.Poll == nil || *cfg.Poll != true {
-		t.Fatalf("expected Poll to be true, got %#v", cfg.Poll)
-	}
-
-	if cfg.Format == nil || *cfg.Format != "json" {
-		t.Fatalf("expected Format to be loaded from config, got %#v", cfg.Format)
-	}
-
-	wantTags := []string{"mobile", "backend"}
-	if cfg.Tags == nil || !reflect.DeepEqual(*cfg.Tags, wantTags) {
-		t.Fatalf("expected Tags %v, got %#v", wantTags, cfg.Tags)
-	}
-
-	if cfg.ConvertPlaceholders == nil || *cfg.ConvertPlaceholders != true {
-		t.Fatalf("expected ConvertPlaceholders to be true, got %#v", cfg.ConvertPlaceholders)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 123 {
-		t.Fatalf("expected FilterTaskID to be 123, got %#v", cfg.FilterTaskID)
+			require.EqualError(
+				t,
+				err,
+				tt.wantErr,
+			)
+		})
 	}
 }
 
-func TestLoadUploadConfig_LoadsValuesFromEnv(t *testing.T) {
-	t.Setenv("LOKEX_UPLOAD_FILENAME", "env-messages.json")
-	t.Setenv("LOKEX_UPLOAD_SRC_PATH", "./env/messages.json")
-	t.Setenv("LOKEX_UPLOAD_LANG_ISO", "fr")
-	t.Setenv("LOKEX_UPLOAD_POLL", "true")
-	t.Setenv("LOKEX_UPLOAD_CONTEXT_TIMEOUT", "2m")
-	t.Setenv("LOKEX_UPLOAD_FORMAT", "xml")
-	t.Setenv("LOKEX_UPLOAD_TAGS", "ios, backend")
-	t.Setenv("LOKEX_UPLOAD_CONVERT_PLACEHOLDERS", "true")
-	t.Setenv("LOKEX_UPLOAD_FILTER_TASK_ID", "987")
+func TestLoadUploadConfig_ReturnsDecodeError(t *testing.T) {
+	v := viper.New()
+
+	v.Set(
+		"upload.filter-task-id",
+		"not-an-int64",
+	)
+
+	cmd := newTestUploadCommand()
 
 	cfg := &UploadConfig{}
 
-	err := LoadUploadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	err := LoadUploadConfig(
+		v,
+		cmd,
+		cfg,
+	)
 
-	if cfg.Filename == nil || *cfg.Filename != "env-messages.json" {
-		t.Fatalf("expected Filename to be loaded from env, got %#v", cfg.Filename)
-	}
-
-	if cfg.SrcPath == nil || *cfg.SrcPath != "./env/messages.json" {
-		t.Fatalf("expected SrcPath to be loaded from env, got %#v", cfg.SrcPath)
-	}
-
-	if cfg.LangISO == nil || *cfg.LangISO != "fr" {
-		t.Fatalf("expected LangISO to be loaded from env, got %#v", cfg.LangISO)
-	}
-
-	if cfg.Poll == nil || *cfg.Poll != true {
-		t.Fatalf("expected Poll to be true, got %#v", cfg.Poll)
-	}
-
-	if cfg.Format == nil || *cfg.Format != "xml" {
-		t.Fatalf("expected Format to be loaded from env, got %#v", cfg.Format)
-	}
-
-	wantTags := []string{"ios", "backend"}
-	if cfg.Tags == nil || !reflect.DeepEqual(*cfg.Tags, wantTags) {
-		t.Fatalf("expected Tags %v, got %#v", wantTags, cfg.Tags)
-	}
-
-	if cfg.ConvertPlaceholders == nil || *cfg.ConvertPlaceholders != true {
-		t.Fatalf("expected ConvertPlaceholders to be true, got %#v", cfg.ConvertPlaceholders)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 987 {
-		t.Fatalf("expected FilterTaskID to be 987, got %#v", cfg.FilterTaskID)
-	}
+	require.Error(t, err)
+	require.Contains(
+		t,
+		err.Error(),
+		"decode upload config:",
+	)
 }
 
-func TestLoadUploadConfig_EnvOverridesConfigFile(t *testing.T) {
-	configFile := filepath.Join(t.TempDir(), "lokex.yaml")
-	content := `
-upload:
-  filename: config-messages.json
-  lang-iso: en
-  poll: false
-  tags:
-    - web
-    - api
-  convert-placeholders: false
-  filter-task-id: 111
-`
-	if err := os.WriteFile(configFile, []byte(strings.TrimSpace(content)), 0o644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
+func TestLoadUploadConfig_UnsetValuesRemainNil(t *testing.T) {
+	v := viper.New()
+	v.Set("upload.filename", "en.json")
 
-	t.Setenv("LOKEX_UPLOAD_FILENAME", "env-messages.json")
-	t.Setenv("LOKEX_UPLOAD_LANG_ISO", "de")
-	t.Setenv("LOKEX_UPLOAD_POLL", "true")
-	t.Setenv("LOKEX_UPLOAD_TAGS", "android,backend")
-	t.Setenv("LOKEX_UPLOAD_CONVERT_PLACEHOLDERS", "true")
-	t.Setenv("LOKEX_UPLOAD_FILTER_TASK_ID", "222")
+	cmd := newTestUploadCommand()
 
 	cfg := &UploadConfig{}
 
-	err := LoadUploadConfig(cfg, configFile, "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(
+		t,
+		LoadUploadConfig(v, cmd, cfg),
+	)
 
-	if cfg.Filename == nil || *cfg.Filename != "env-messages.json" {
-		t.Fatalf("expected env to override config for Filename, got %#v", cfg.Filename)
-	}
-
-	if cfg.LangISO == nil || *cfg.LangISO != "de" {
-		t.Fatalf("expected env to override config for LangISO, got %#v", cfg.LangISO)
-	}
-
-	if cfg.Poll == nil || *cfg.Poll != true {
-		t.Fatalf("expected env to override config for Poll, got %#v", cfg.Poll)
-	}
-
-	wantTags := []string{"android", "backend"}
-	if cfg.Tags == nil || !reflect.DeepEqual(*cfg.Tags, wantTags) {
-		t.Fatalf("expected env to override config for Tags, got %#v", cfg.Tags)
-	}
-
-	if cfg.ConvertPlaceholders == nil || *cfg.ConvertPlaceholders != true {
-		t.Fatalf("expected env to override config for ConvertPlaceholders, got %#v", cfg.ConvertPlaceholders)
-	}
-
-	if cfg.FilterTaskID == nil || *cfg.FilterTaskID != 222 {
-		t.Fatalf("expected env to override config for FilterTaskID, got %#v", cfg.FilterTaskID)
-	}
+	require.NotNil(t, cfg.Filename)
+	require.Nil(t, cfg.Poll)
+	require.Nil(t, cfg.ApplyTM)
+	require.Nil(t, cfg.Tags)
+	require.Nil(t, cfg.FilterTaskID)
 }
 
-func TestLoadUploadConfig_EmptyStringSliceEnvDoesNotSetField(t *testing.T) {
-	t.Setenv("LOKEX_UPLOAD_TAGS", " , ,  , ")
-
-	cfg := &UploadConfig{}
-
-	err := LoadUploadConfig(cfg, "", "LOKEX")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+func newTestUploadCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "upload",
 	}
 
-	if cfg.Tags != nil {
-		t.Fatalf("expected Tags to stay nil, got %#v", cfg.Tags)
-	}
+	params.BindFlags(
+		cmd,
+		uploadParamSpecs,
+	)
+
+	return cmd
 }

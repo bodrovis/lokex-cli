@@ -3,9 +3,11 @@ package global_config
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestValidateClientConfig(t *testing.T) {
+func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -39,14 +41,14 @@ func TestValidateClientConfig(t *testing.T) {
 			cfg: GlobalConfig{
 				ProjectID: "project-id",
 			},
-			wantErr: "--token is required",
+			wantErr: "token is required",
 		},
 		{
 			name: "missing project id",
 			cfg: GlobalConfig{
 				Token: "token",
 			},
-			wantErr: "--project-id is required",
+			wantErr: "project-id is required",
 		},
 		{
 			name: "whitespace only values",
@@ -54,7 +56,7 @@ func TestValidateClientConfig(t *testing.T) {
 				Token:     "   ",
 				ProjectID: "   ",
 			},
-			wantErr: "--token is required",
+			wantErr: "token is required",
 		},
 		{
 			name: "negative http timeout",
@@ -63,7 +65,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:   "project-id",
 				HTTPTimeout: -1 * time.Second,
 			},
-			wantErr: "--http-timeout must be >= 0",
+			wantErr: "http-timeout must be >= 0",
 		},
 		{
 			name: "negative context timeout",
@@ -72,7 +74,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:      "project-id",
 				ContextTimeout: -1 * time.Second,
 			},
-			wantErr: "--context-timeout must be >= 0",
+			wantErr: "context-timeout must be >= 0",
 		},
 		{
 			name: "zero context timeout is allowed",
@@ -97,7 +99,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:  "project-id",
 				MaxRetries: -2,
 			},
-			wantErr: "--retries must be >= -1",
+			wantErr: "retries must be >= -1",
 		},
 		{
 			name: "retries minus one is allowed",
@@ -114,7 +116,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:      "project-id",
 				InitialBackoff: -1 * time.Second,
 			},
-			wantErr: "--backoff-initial must be >= 0",
+			wantErr: "backoff-initial must be >= 0",
 		},
 		{
 			name: "negative max backoff",
@@ -123,7 +125,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:  "project-id",
 				MaxBackoff: -1 * time.Second,
 			},
-			wantErr: "--backoff-max must be >= 0",
+			wantErr: "backoff-max must be >= 0",
 		},
 		{
 			name: "negative poll initial wait",
@@ -132,7 +134,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:       "project-id",
 				PollInitialWait: -1 * time.Second,
 			},
-			wantErr: "--poll-initial-wait must be >= 0",
+			wantErr: "poll-initial-wait must be >= 0",
 		},
 		{
 			name: "negative poll max wait",
@@ -141,7 +143,7 @@ func TestValidateClientConfig(t *testing.T) {
 				ProjectID:   "project-id",
 				PollMaxWait: -1 * time.Second,
 			},
-			wantErr: "--poll-max-wait must be >= 0",
+			wantErr: "poll-max-wait must be >= 0",
 		},
 		{
 			name: "max backoff less than initial backoff",
@@ -151,7 +153,7 @@ func TestValidateClientConfig(t *testing.T) {
 				InitialBackoff: 5 * time.Second,
 				MaxBackoff:     1 * time.Second,
 			},
-			wantErr: "--backoff-max must be >= --backoff-initial",
+			wantErr: "backoff-max must be >= backoff-initial",
 		},
 		{
 			name: "poll max wait less than poll initial wait",
@@ -161,7 +163,7 @@ func TestValidateClientConfig(t *testing.T) {
 				PollInitialWait: 10 * time.Second,
 				PollMaxWait:     2 * time.Second,
 			},
-			wantErr: "--poll-max-wait must be >= --poll-initial-wait",
+			wantErr: "poll-max-wait must be >= poll-initial-wait",
 		},
 		{
 			name: "equal backoff bounds are allowed",
@@ -237,18 +239,14 @@ func TestValidateClientConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.cfg.ValidateClientConfig()
-			if tt.wantErr == "" && err != nil {
-				t.Fatalf("expected no error, got %v", err)
+			err := tt.cfg.Validate()
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
 			}
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error %q, got nil", tt.wantErr)
-				}
-				if err.Error() != tt.wantErr {
-					t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
-				}
-			}
+
+			require.EqualError(t, err, tt.wantErr)
 		})
 	}
 }
