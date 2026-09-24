@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 
 	downloadcmd "github.com/bodrovis/lokex-cli/cmd/download"
+	manifestcmd "github.com/bodrovis/lokex-cli/cmd/manifest"
 	uploadcmd "github.com/bodrovis/lokex-cli/cmd/upload"
 	"github.com/bodrovis/lokex-cli/internal/appstate"
 	"github.com/bodrovis/lokex-cli/internal/global_config"
@@ -44,16 +45,14 @@ func newRootCmd(
 
 	cmd := &cobra.Command{
 		Use:   "lokex-cli",
-		Short: "CLI for uploading and downloading files with Lokalise",
-		Long: `lokex-cli is a focused CLI built on top of Lokex for fast file exchange with Lokalise.
+		Short: "CLI for file exchange and upload manifest workflows with Lokalise",
+		Long: `lokex-cli is a focused CLI built on top of Lokex for file exchange with Lokalise.
 
-It is intentionally limited to two core operations:
+It supports uploading and downloading files, as well as generating upload
+manifests for batch upload workflows.
 
-  - upload files
-  - download files
-
-This tool is optimized for import/export workflows and direct access to file-related API parameters.
-`,
+The CLI provides direct access to file-related API parameters and can load
+settings from command-line flags, environment variables, and YAML config files.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: newPersistentPreRunE(
@@ -86,6 +85,7 @@ This tool is optimized for import/export workflows and direct access to file-rel
 
 	cmd.AddCommand(downloadcmd.NewCommand(cfg, state))
 	cmd.AddCommand(uploadcmd.NewCommand(cfg, state))
+	cmd.AddCommand(manifestcmd.NewCommand(state))
 
 	return cmd
 }

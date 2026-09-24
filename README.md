@@ -340,6 +340,273 @@ So the normal upload flow is:
 - provide `--lang-iso`
 - let the tool read and encode the file itself
 
+## Generate upload manifests
+
+Use `manifest generate` to scan local translation files and create a manifest for batch uploads.
+
+The generated manifest can then be passed to `upload`:
+
+```bash
+lokex-cli upload --manifest ./lokex-manifest.json
+```
+
+For example, given:
+
+```text
+locales/
+├── de/
+│   └── common.json
+├── en/
+│   └── common.json
+└── fr/
+    └── common.json
+```
+
+generate a manifest with:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{lang}/{name}.{ext}"
+```
+
+The resulting manifest contains the detected source path, filename, and language for every matching file:
+
+```json
+{
+  "items": [
+    {
+      "params": {
+        "filename": "common.json",
+        "lang_iso": "de"
+      },
+      "src_path": "locales/de/common.json"
+    }
+  ]
+}
+```
+
+Source paths in the manifest are stored relative to the manifest file location.
+
+### Path patterns
+
+Use `--name-pattern` to describe how translation files are organized.
+
+Patterns can contain named placeholders. The built-in placeholders are `{lang}`, `{name}`, and `{ext}`, but custom placeholders are also supported.
+
+For example:
+
+```text
+{lang}/{name}.{ext}
+```
+
+matches:
+
+```text
+en/common.json
+```
+
+and captures:
+
+```text
+lang = en
+name = common
+ext = json
+```
+
+Neither `{name}` nor `{ext}` is required. A layout where filenames contain only the language can be described as:
+
+```text
+{lang}.{ext}
+```
+
+which matches files such as:
+
+```text
+en.json
+de.json
+fr.json
+```
+
+Patterns also support glob wildcards:
+
+| Pattern  | Meaning                                        |
+| -------- | ---------------------------------------------- |
+| `*`      | Matches within a single path segment           |
+| `**`     | Matches across any number of directories       |
+| `{name}` | Captures a path value that can be reused later |
+
+For example:
+
+```text
+**/locales/{lang}.{ext}
+```
+
+can match:
+
+```text
+apps/mobile/locales/en.json
+packages/shared/locales/de.json
+locales/fr.json
+```
+
+A globstar can also be used between path components:
+
+```text
+**/locales/**/{lang}.{ext}
+```
+
+which can match both:
+
+```text
+apps/mobile/locales/de.json
+locales/web/en.json
+```
+
+### Custom placeholders
+
+Custom placeholders are useful for monorepos.
+
+Given:
+
+```text
+apps/
+├── mobile/
+│   └── locales/
+│       └── de.json
+└── web/
+    └── locales/
+        └── en.json
+```
+
+you can capture the application name:
+
+```bash
+lokex-cli manifest generate --path ./apps --name-pattern "{app}/locales/{lang}.{ext}" --filename-pattern "{app}/{lang}.{ext}"
+```
+
+Here, `{app}` is a custom placeholder. It is captured from the source path and reused when generating the filename.
+
+The resulting filenames are:
+
+```text
+mobile/de.json
+web/en.json
+```
+
+Custom placeholders can be combined with globstars:
+
+```bash
+lokex-cli manifest generate --path . --name-pattern "**/apps/{app}/locales/{lang}.{ext}" --filename-pattern "{app}/{lang}.{ext}"
+```
+
+### Filename patterns
+
+Use `--filename-pattern` to control the filename stored in each manifest item.
+
+Its default value is:
+
+```text
+{name}.{ext}
+```
+
+Any placeholder captured by `--name-pattern` can be used in `--filename-pattern`.
+
+For example:
+
+```bash
+lokex-cli manifest generate --path ./apps --name-pattern "{app}/locales/{lang}/{name}.{ext}" --filename-pattern "{app}/{name}.{ext}"
+```
+
+A filename pattern cannot use a placeholder that is not provided by the name pattern, except `{lang}` when `--base-lang` is used.
+
+### Base language
+
+If the source paths do not contain a language, use `--base-lang`.
+
+For example:
+
+```text
+locales/
+├── common.json
+└── errors.json
+```
+
+can be processed with:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{name}.{ext}" --base-lang en
+```
+
+All matching files receive:
+
+```json
+"lang_iso": "en"
+```
+
+### Language mapping
+
+Use `--language-mapping` to map detected language codes to different Lokalise language codes.
+
+For example:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{lang}/{name}.{ext}" --language-mapping "[{\"original_language_iso\":\"en\",\"custom_language_iso\":\"en-US\"}]"
+```
+
+Language mapping changes the generated `lang_iso` value. It does not change the original value captured by `{lang}` when that placeholder is used in `--filename-pattern`.
+
+For example, with:
+
+```text
+en/common.json
+```
+
+and:
+
+```text
+--filename-pattern "{lang}/{name}.{ext}"
+```
+
+the generated values can be:
+
+```json
+{
+  "filename": "en/common.json",
+  "lang_iso": "en-US"
+}
+```
+
+### Excluding files
+
+Use `--exclude-pattern` to skip files. The option can be specified multiple times.
+
+For example:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{lang}/{name}.{ext}" --exclude-pattern "**/*.test.json"
+```
+
+### Output
+
+By default, the manifest is written to:
+
+```text
+./lokex-manifest.json
+```
+
+Choose another location with `--out`:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{lang}/{name}.{ext}" --out ./tmp/upload-manifest.json
+```
+
+Use `--out -` to write only the generated JSON to standard output:
+
+```bash
+lokex-cli manifest generate --path ./locales --name-pattern "{lang}/{name}.{ext}" --out -
+```
+
+This makes it possible to pipe the manifest to another command without additional status output.
+
 ## Passing arrays and JSON via CLI
 
 Some flags accept arrays (lists of values) or structured JSON. Here is how to pass them in a shell.
