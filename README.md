@@ -384,7 +384,7 @@ The resulting manifest contains the detected source path, filename, and language
 }
 ```
 
-Source paths in the manifest are stored relative to the manifest file location.
+Source paths in the manifest are stored relative to the manifest file location when possible. If the source and manifest are on different filesystem volumes, an absolute source path is used instead.
 
 ### Path patterns
 

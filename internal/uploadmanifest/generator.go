@@ -271,6 +271,15 @@ func relativeSourcePath(
 		)
 	}
 
+	if !sameVolume(
+		manifestDirAbs,
+		sourceAbs,
+	) {
+		return filepath.ToSlash(
+			sourceAbs,
+		), nil
+	}
+
 	relative, err := filepath.Rel(
 		manifestDirAbs,
 		sourceAbs,
@@ -285,4 +294,14 @@ func relativeSourcePath(
 	}
 
 	return filepath.ToSlash(relative), nil
+}
+
+func sameVolume(
+	left string,
+	right string,
+) bool {
+	return strings.EqualFold(
+		filepath.VolumeName(left),
+		filepath.VolumeName(right),
+	)
 }

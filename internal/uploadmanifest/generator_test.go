@@ -471,3 +471,51 @@ func TestGenerate_CustomCaptureWithGlobstar(t *testing.T) {
 		mf,
 	)
 }
+
+func TestRelativeSourcePath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	manifestDir := filepath.Join(
+		root,
+		"manifests",
+	)
+
+	sourcePath := filepath.Join(
+		root,
+		"locales",
+		"en",
+		"common.json",
+	)
+
+	got, err := relativeSourcePath(
+		manifestDir,
+		sourcePath,
+	)
+
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		"../locales/en/common.json",
+		got,
+	)
+}
+
+func TestSameVolume(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	require.True(
+		t,
+		sameVolume(
+			root,
+			filepath.Join(
+				root,
+				"locales",
+			),
+		),
+	)
+}
