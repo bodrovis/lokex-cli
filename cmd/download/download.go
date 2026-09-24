@@ -78,12 +78,12 @@ func validateCommand(
 		return errors.New("download config is nil")
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidateProjectAccess(); err != nil {
 		return err
 	}
 
 	if ptrutil.TrimmedString(downloadCfg.Format) == "" {
-		return errors.New("--format is required")
+		return errors.New("format is required")
 	}
 
 	return nil

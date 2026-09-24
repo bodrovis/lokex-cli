@@ -186,7 +186,7 @@ func TestValidateCommand(t *testing.T) {
 				ProjectID: "project-id",
 			},
 			downloadCfg: &DownloadConfig{},
-			wantErr:     "--format is required",
+			wantErr:     "format is required",
 		},
 		{
 			name: "whitespace format",
@@ -197,7 +197,7 @@ func TestValidateCommand(t *testing.T) {
 			downloadCfg: &DownloadConfig{
 				Format: new("   "),
 			},
-			wantErr: "--format is required",
+			wantErr: "format is required",
 		},
 	}
 

@@ -155,6 +155,17 @@ func TestValidateCommand(t *testing.T) {
 			wantErr: "global config is nil",
 		},
 		{
+			name: "missing project id",
+			cfg: &global_config.GlobalConfig{
+				Token: "token",
+			},
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
+			},
+			wantErr: "project-id is required",
+		},
+		{
 			name: "missing upload config",
 			cfg: &global_config.GlobalConfig{
 				Token:     "token",
@@ -185,17 +196,6 @@ func TestValidateCommand(t *testing.T) {
 			wantErr: "token is required",
 		},
 		{
-			name: "missing project id",
-			cfg: &global_config.GlobalConfig{
-				Token: "token",
-			},
-			uploadCfg: &UploadConfig{
-				Filename: new("en.json"),
-				LangISO:  new("en"),
-			},
-			wantErr: "project-id is required",
-		},
-		{
 			name: "missing project id with manifest",
 			cfg: &global_config.GlobalConfig{
 				Token: "token",
@@ -214,7 +214,7 @@ func TestValidateCommand(t *testing.T) {
 			uploadCfg: &UploadConfig{
 				LangISO: new("en"),
 			},
-			wantErr: "--filename is required",
+			wantErr: "filename is required",
 		},
 		{
 			name: "whitespace filename",
@@ -226,7 +226,7 @@ func TestValidateCommand(t *testing.T) {
 				Filename: new("   "),
 				LangISO:  new("en"),
 			},
-			wantErr: "--filename is required",
+			wantErr: "filename is required",
 		},
 		{
 			name: "missing lang iso",
@@ -237,7 +237,7 @@ func TestValidateCommand(t *testing.T) {
 			uploadCfg: &UploadConfig{
 				Filename: new("en.json"),
 			},
-			wantErr: "--lang-iso is required",
+			wantErr: "lang-iso is required",
 		},
 		{
 			name: "whitespace lang iso",
@@ -249,7 +249,7 @@ func TestValidateCommand(t *testing.T) {
 				Filename: new("en.json"),
 				LangISO:  new("   "),
 			},
-			wantErr: "--lang-iso is required",
+			wantErr: "lang-iso is required",
 		},
 	}
 

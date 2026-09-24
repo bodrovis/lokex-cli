@@ -73,7 +73,7 @@ func validateCommand(
 		return errors.New("upload config is nil")
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidateProjectAccess(); err != nil {
 		return err
 	}
 
@@ -82,11 +82,11 @@ func validateCommand(
 	}
 
 	if ptrutil.TrimmedString(uploadCfg.Filename) == "" {
-		return errors.New("--filename is required")
+		return errors.New("filename is required")
 	}
 
 	if ptrutil.TrimmedString(uploadCfg.LangISO) == "" {
-		return errors.New("--lang-iso is required")
+		return errors.New("lang-iso is required")
 	}
 
 	return nil
