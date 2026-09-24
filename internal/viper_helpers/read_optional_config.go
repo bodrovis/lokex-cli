@@ -9,11 +9,10 @@ import (
 
 func ReadOptionalConfig(v *viper.Viper, explicitPath string) error {
 	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
 		if strings.TrimSpace(explicitPath) != "" {
 			return err
 		}
-		if !errors.As(err, &notFound) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			return err
 		}
 	}

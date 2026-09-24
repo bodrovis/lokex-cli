@@ -5,15 +5,16 @@ import (
 )
 
 type GlobalConfig struct {
-	Token           string
-	ProjectID       string
-	BaseURL         string
-	UserAgent       string
-	HTTPTimeout     time.Duration
-	MaxRetries      int
-	InitialBackoff  time.Duration
-	MaxBackoff      time.Duration
-	PollInitialWait time.Duration
-	PollMaxWait     time.Duration
-	ContextTimeout  time.Duration
+	Token     string `mapstructure:"token"`
+	ProjectID string `mapstructure:"project-id"`
+	BaseURL   string `mapstructure:"base-url"`
+	UserAgent string `mapstructure:"user-agent"`
+
+	HTTPTimeout     time.Duration `mapstructure:"http-timeout"`
+	MaxRetries      int           `mapstructure:"retries"`
+	InitialBackoff  time.Duration `mapstructure:"backoff-initial"`
+	MaxBackoff      time.Duration `mapstructure:"backoff-max"`
+	PollInitialWait time.Duration `mapstructure:"poll-initial-wait"`
+	PollMaxWait     time.Duration `mapstructure:"poll-max-wait"`
+	ContextTimeout  time.Duration `mapstructure:"context-timeout"`
 }

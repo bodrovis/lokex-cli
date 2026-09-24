@@ -2,65 +2,98 @@ package download
 
 import (
 	"context"
-	"fmt"
-	"strings"
+	"errors"
 
 	"github.com/spf13/cobra"
 
+	"github.com/bodrovis/lokex-cli/internal/appstate"
 	commandctx "github.com/bodrovis/lokex-cli/internal/commandctx"
 	globalCfg "github.com/bodrovis/lokex-cli/internal/global_config"
-	params "github.com/bodrovis/lokex-cli/internal/params"
+	"github.com/bodrovis/lokex-cli/internal/params"
+	"github.com/bodrovis/lokex-cli/internal/ptrutil"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
 )
 
 type downloader interface {
-	Download(ctx context.Context, out string, params lokexdownload.DownloadParams) (string, error)
-	DownloadAsync(ctx context.Context, out string, params lokexdownload.DownloadParams) (string, error)
+	Download(
+		ctx context.Context,
+		out string,
+		params lokexdownload.DownloadParams,
+	) (string, error)
+
+	DownloadAsync(
+		ctx context.Context,
+		out string,
+		params lokexdownload.DownloadParams,
+	) (string, error)
 }
 
 var newDownloaderFunc = newDownloader
 
-func NewCommand(cfg *globalCfg.GlobalConfig, defaults *DownloadConfig) *cobra.Command {
-	flags := newFlags()
+func NewCommand(
+	cfg *globalCfg.GlobalConfig,
+	state *appstate.State,
+) *cobra.Command {
+	resolved := &DownloadConfig{}
 
 	cmd := &cobra.Command{
 		Use:   "download",
 		Short: "Download translation files from Lokalise",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			params.ApplyDefaults(cmd, flags, defaults, downloadParamSpecs)
-			return validateCommand(cfg, flags)
+
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			if state == nil || state.Viper == nil {
+				return errors.New("application config is not initialized")
+			}
+
+			if err := LoadDownloadConfig(
+				state.Viper,
+				cmd,
+				resolved,
+			); err != nil {
+				return err
+			}
+
+			return validateCommand(cfg, resolved)
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCommand(cmd, cfg, flags, defaults)
+
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runCommand(cmd, cfg, resolved)
 		},
 	}
 
-	bindFlags(cmd, flags)
+	params.BindFlags(cmd, downloadParamSpecs)
 
 	return cmd
 }
 
-func validateCommand(cfg *globalCfg.GlobalConfig, flags *Flags) error {
+func validateCommand(
+	cfg *globalCfg.GlobalConfig,
+	downloadCfg *DownloadConfig,
+) error {
 	if cfg == nil {
-		return fmt.Errorf("global config is nil")
+		return errors.New("global config is nil")
 	}
 
-	if flags == nil {
-		return fmt.Errorf("download flags are nil")
+	if downloadCfg == nil {
+		return errors.New("download config is nil")
 	}
 
-	if err := cfg.ValidateClientConfig(); err != nil {
+	if err := cfg.ValidateProjectAccess(); err != nil {
 		return err
 	}
 
-	if strings.TrimSpace(flags.Format) == "" {
-		return fmt.Errorf("--format is required")
+	if ptrutil.TrimmedString(downloadCfg.Format) == "" {
+		return errors.New("format is required")
 	}
 
 	return nil
 }
 
-func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, defaults *DownloadConfig) error {
+func runCommand(
+	cmd *cobra.Command,
+	cfg *globalCfg.GlobalConfig,
+	downloadCfg *DownloadConfig,
+) error {
 	dl, err := newDownloaderFunc(cfg)
 	if err != nil {
 		return err
@@ -69,12 +102,18 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 	ctx, cancel := commandctx.NewCommandContext(cfg.ContextTimeout)
 	defer cancel()
 
-	params, err := buildParams(cmd, flags, defaults)
+	requestParams, err := buildParams(downloadCfg)
 	if err != nil {
 		return err
 	}
 
-	url, err := performDownload(ctx, dl, flags, params)
+	url, err := performDownload(
+		ctx,
+		dl,
+		requestParams,
+		ptrutil.Value(downloadCfg.Out),
+		ptrutil.Value(downloadCfg.Async),
+	)
 	if err != nil {
 		return err
 	}
@@ -84,7 +123,9 @@ func runCommand(cmd *cobra.Command, cfg *globalCfg.GlobalConfig, flags *Flags, d
 	return nil
 }
 
-func newDownloader(cfg *globalCfg.GlobalConfig) (downloader, error) {
+func newDownloader(
+	cfg *globalCfg.GlobalConfig,
+) (downloader, error) {
 	client, err := cfg.NewClient()
 	if err != nil {
 		return nil, err
@@ -93,32 +134,45 @@ func newDownloader(cfg *globalCfg.GlobalConfig) (downloader, error) {
 	return lokexdownload.NewDownloader(client), nil
 }
 
-func printDownloadResult(cmd *cobra.Command, url string) {
-	cmd.Printf("Bundle downloaded from: %s\n", truncateURLForOutput(url, 150))
-}
-
 func performDownload(
 	ctx context.Context,
 	dl downloader,
-	flags *Flags,
-	params lokexdownload.DownloadParams,
+	requestParams lokexdownload.DownloadParams,
+	out string,
+	async bool,
 ) (string, error) {
-	if flags.Async {
-		return dl.DownloadAsync(ctx, flags.Out, params)
+	if async {
+		return dl.DownloadAsync(ctx, out, requestParams)
 	}
 
-	return dl.Download(ctx, flags.Out, params)
+	return dl.Download(ctx, out, requestParams)
 }
 
-func truncateURLForOutput(url string, max int) string {
+func printDownloadResult(
+	cmd *cobra.Command,
+	url string,
+) {
+	cmd.Printf(
+		"Bundle downloaded from: %s\n",
+		truncateURLForOutput(url, 150),
+	)
+}
+
+func truncateURLForOutput(
+	url string,
+	max int,
+) string {
 	if max <= 0 {
 		return ""
 	}
+
 	if len(url) <= max {
 		return url
 	}
+
 	if max <= 3 {
 		return url[:max]
 	}
+
 	return url[:max-3] + "..."
 }

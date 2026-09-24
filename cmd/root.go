@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	downloadcmd "github.com/bodrovis/lokex-cli/cmd/download"
 	uploadcmd "github.com/bodrovis/lokex-cli/cmd/upload"
+	"github.com/bodrovis/lokex-cli/internal/appstate"
 	"github.com/bodrovis/lokex-cli/internal/global_config"
+	"github.com/bodrovis/lokex-cli/internal/viper_helpers"
 )
 
 const skipConfigAnnotation = "skipConfig"
@@ -18,30 +21,24 @@ var (
 	date    = "unknown"
 )
 
-type (
-	loadGlobalConfigInputFunc func(string, global_config.LoadOptions) (*global_config.GlobalConfigInput, error)
-	loadUploadConfigFunc      func(*uploadcmd.UploadConfig, string, string) error
-	loadDownloadConfigFunc    func(*downloadcmd.DownloadConfig, string, string) error
-)
+type loadGlobalConfigFunc func(
+	*viper.Viper,
+	*cobra.Command,
+	*global_config.GlobalConfig,
+) error
 
 func RootCmd() *cobra.Command {
-	return newRootCmd(
-		global_config.LoadGlobalConfigInput,
-		uploadcmd.LoadUploadConfig,
-		downloadcmd.LoadDownloadConfig,
-	)
+	return newRootCmd(global_config.LoadGlobalConfig)
 }
 
 func newRootCmd(
-	loadGlobal loadGlobalConfigInputFunc,
-	loadUpload loadUploadConfigFunc,
-	loadDownload loadDownloadConfigFunc,
+	loadGlobal loadGlobalConfigFunc,
 ) *cobra.Command {
 	cfg := &global_config.GlobalConfig{
 		UserAgent: fmt.Sprintf("lokex-cli/%s", version),
 	}
-	uploadCfg := &uploadcmd.UploadConfig{}
-	downloadCfg := &downloadcmd.DownloadConfig{}
+
+	state := &appstate.State{}
 
 	var configFile string
 
@@ -51,6 +48,7 @@ func newRootCmd(
 		Long: `lokex-cli is a focused CLI built on top of Lokex for fast file exchange with Lokalise.
 
 It is intentionally limited to two core operations:
+
   - upload files
   - download files
 
@@ -60,17 +58,23 @@ This tool is optimized for import/export workflows and direct access to file-rel
 		SilenceErrors: true,
 		PersistentPreRunE: newPersistentPreRunE(
 			cfg,
-			uploadCfg,
-			downloadCfg,
+			state,
 			&configFile,
 			loadGlobal,
-			loadUpload,
-			loadDownload,
 		),
 	}
 
-	global_config.BindPersistentFlags(cmd.PersistentFlags(), cfg)
-	cmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to YAML config file")
+	global_config.BindPersistentFlags(
+		cmd.PersistentFlags(),
+		cfg.UserAgent,
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&configFile,
+		"config",
+		"",
+		"Path to YAML config file",
+	)
 
 	versionCmd := newVersionCmd()
 	markSkipConfig(versionCmd)
@@ -80,48 +84,44 @@ This tool is optimized for import/export workflows and direct access to file-rel
 	markSkipConfig(genDocsCmd)
 	cmd.AddCommand(genDocsCmd)
 
-	cmd.AddCommand(downloadcmd.NewCommand(cfg, downloadCfg))
-	cmd.AddCommand(uploadcmd.NewCommand(cfg, uploadCfg))
+	cmd.AddCommand(downloadcmd.NewCommand(cfg, state))
+	cmd.AddCommand(uploadcmd.NewCommand(cfg, state))
 
 	return cmd
 }
 
 func newPersistentPreRunE(
 	cfg *global_config.GlobalConfig,
-	uploadCfg *uploadcmd.UploadConfig,
-	downloadCfg *downloadcmd.DownloadConfig,
+	state *appstate.State,
 	configFile *string,
-	loadGlobal loadGlobalConfigInputFunc,
-	loadUpload loadUploadConfigFunc,
-	loadDownload loadDownloadConfigFunc,
-) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
+	loadGlobal loadGlobalConfigFunc,
+) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, _ []string) error {
 		if shouldSkipConfig(cmd) {
 			return nil
 		}
 
-		loadOpts := global_config.LoadOptions{
-			ConfigFile: *configFile,
-			EnvPrefix:  "LOKEX",
+		v := viper_helpers.NewConfigViper(
+			*configFile,
+			"LOKEX",
+		)
+
+		if err := viper_helpers.ReadOptionalConfig(
+			v,
+			*configFile,
+		); err != nil {
+			return fmt.Errorf("read config: %w", err)
 		}
 
-		globalInput, err := loadGlobal(cfg.UserAgent, loadOpts)
-		if err != nil {
+		if err := loadGlobal(
+			v,
+			cmd,
+			cfg,
+		); err != nil {
 			return err
 		}
 
-		global_config.ApplyGlobalInput(cmd, cfg, globalInput)
-
-		switch cmd.Name() {
-		case "upload":
-			if err := loadUpload(uploadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
-				return err
-			}
-		case "download":
-			if err := loadDownload(downloadCfg, loadOpts.ConfigFile, loadOpts.EnvPrefix); err != nil {
-				return err
-			}
-		}
+		state.Viper = v
 
 		return nil
 	}

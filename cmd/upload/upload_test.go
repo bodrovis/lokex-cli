@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
-
+	"github.com/bodrovis/lokex-cli/internal/appstate"
 	"github.com/bodrovis/lokex-cli/internal/global_config"
+	"github.com/bodrovis/lokex-cli/internal/params"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockUploader struct {
@@ -27,8 +30,9 @@ type mockUploader struct {
 	gotBatchItems []lokexupload.BatchUploadItem
 	gotBatchPoll  bool
 
-	result      string
-	err         error
+	result string
+	err    error
+
 	batchResult lokexupload.BatchUploadResult
 	batchErr    error
 }
@@ -44,6 +48,7 @@ func (m *mockUploader) Upload(
 	m.gotParams = params
 	m.gotSrcPath = srcPath
 	m.gotPoll = poll
+
 	return m.result, m.err
 }
 
@@ -56,6 +61,7 @@ func (m *mockUploader) UploadBatch(
 	m.gotBatchCtx = ctx
 	m.gotBatchItems = items
 	m.gotBatchPoll = poll
+
 	return m.batchResult, m.batchErr
 }
 
@@ -64,12 +70,9 @@ func TestNewUploader(t *testing.T) {
 		cfg := &global_config.GlobalConfig{}
 
 		got, err := newUploader(cfg)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if got != nil {
-			t.Fatalf("expected nil uploader, got %#v", got)
-		}
+
+		require.Error(t, err)
+		require.Nil(t, got)
 	})
 
 	t.Run("returns uploader when client config is valid", func(t *testing.T) {
@@ -79,44 +82,35 @@ func TestNewUploader(t *testing.T) {
 		}
 
 		got, err := newUploader(cfg)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if got == nil {
-			t.Fatal("expected non-nil uploader")
-		}
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
 	})
 }
 
 func TestNewCommand(t *testing.T) {
 	cfg := &global_config.GlobalConfig{}
-	uploadCfg := &UploadConfig{}
+	state := &appstate.State{}
 
-	cmd := NewCommand(cfg, uploadCfg)
-	if cmd == nil {
-		t.Fatal("expected non-nil command")
-	}
+	cmd := NewCommand(
+		cfg,
+		state,
+	)
 
-	if cmd.Use != "upload" {
-		t.Fatalf("unexpected Use: got %q, want %q", cmd.Use, "upload")
-	}
-	if cmd.Short != "Upload translation files to Lokalise" {
-		t.Fatalf("unexpected Short: got %q", cmd.Short)
-	}
-	if cmd.PreRunE == nil {
-		t.Fatal("expected PreRunE to be set")
-	}
-	if cmd.RunE == nil {
-		t.Fatal("expected RunE to be set")
-	}
+	require.NotNil(t, cmd)
+	assert.Equal(t, "upload", cmd.Use)
+	assert.Equal(t, "Upload translation files to Lokalise", cmd.Short)
+
+	require.NotNil(t, cmd.PreRunE)
+	require.NotNil(t, cmd.RunE)
 }
 
 func TestValidateCommand(t *testing.T) {
 	tests := []struct {
-		name    string
-		cfg     *global_config.GlobalConfig
-		flags   *Flags
-		wantErr string
+		name      string
+		cfg       *global_config.GlobalConfig
+		uploadCfg *UploadConfig
+		wantErr   string
 	}{
 		{
 			name: "ok",
@@ -124,9 +118,9 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Filename: "en.json",
-				LangISO:  "en",
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
 			},
 		},
 		{
@@ -135,8 +129,8 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Manifest: "manifest.json",
+			uploadCfg: &UploadConfig{
+				Manifest: new("manifest.json"),
 			},
 		},
 		{
@@ -145,70 +139,71 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Manifest: "manifest.json",
-				Filename: "   ",
-				LangISO:  "   ",
+			uploadCfg: &UploadConfig{
+				Manifest: new("manifest.json"),
+				Filename: new("   "),
+				LangISO:  new("   "),
 			},
 		},
 		{
 			name: "missing config",
 			cfg:  nil,
-			flags: &Flags{
-				Filename: "en.json",
-				LangISO:  "en",
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
 			},
 			wantErr: "global config is nil",
-		},
-		{
-			name: "missing flags",
-			cfg: &global_config.GlobalConfig{
-				ProjectID: "project-id",
-			},
-			flags:   nil,
-			wantErr: "upload flags are nil",
-		},
-		{
-			name: "missing token",
-			cfg: &global_config.GlobalConfig{
-				ProjectID: "project-id",
-			},
-			flags: &Flags{
-				Filename: "en.json",
-				LangISO:  "en",
-			},
-			wantErr: "--token is required",
-		},
-		{
-			name: "missing token with manifest",
-			cfg: &global_config.GlobalConfig{
-				ProjectID: "project-id",
-			},
-			flags: &Flags{
-				Manifest: "manifest.json",
-			},
-			wantErr: "--token is required",
 		},
 		{
 			name: "missing project id",
 			cfg: &global_config.GlobalConfig{
 				Token: "token",
 			},
-			flags: &Flags{
-				Filename: "en.json",
-				LangISO:  "en",
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
 			},
-			wantErr: "--project-id is required",
+			wantErr: "project-id is required",
+		},
+		{
+			name: "missing upload config",
+			cfg: &global_config.GlobalConfig{
+				Token:     "token",
+				ProjectID: "project-id",
+			},
+			uploadCfg: nil,
+			wantErr:   "upload config is nil",
+		},
+		{
+			name: "missing token",
+			cfg: &global_config.GlobalConfig{
+				ProjectID: "project-id",
+			},
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
+			},
+			wantErr: "token is required",
+		},
+		{
+			name: "missing token with manifest",
+			cfg: &global_config.GlobalConfig{
+				ProjectID: "project-id",
+			},
+			uploadCfg: &UploadConfig{
+				Manifest: new("manifest.json"),
+			},
+			wantErr: "token is required",
 		},
 		{
 			name: "missing project id with manifest",
 			cfg: &global_config.GlobalConfig{
 				Token: "token",
 			},
-			flags: &Flags{
-				Manifest: "manifest.json",
+			uploadCfg: &UploadConfig{
+				Manifest: new("manifest.json"),
 			},
-			wantErr: "--project-id is required",
+			wantErr: "project-id is required",
 		},
 		{
 			name: "missing filename",
@@ -216,10 +211,10 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				LangISO: "en",
+			uploadCfg: &UploadConfig{
+				LangISO: new("en"),
 			},
-			wantErr: "--filename is required",
+			wantErr: "filename is required",
 		},
 		{
 			name: "whitespace filename",
@@ -227,11 +222,11 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Filename: "   ",
-				LangISO:  "en",
+			uploadCfg: &UploadConfig{
+				Filename: new("   "),
+				LangISO:  new("en"),
 			},
-			wantErr: "--filename is required",
+			wantErr: "filename is required",
 		},
 		{
 			name: "missing lang iso",
@@ -239,10 +234,10 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Filename: "en.json",
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
 			},
-			wantErr: "--lang-iso is required",
+			wantErr: "lang-iso is required",
 		},
 		{
 			name: "whitespace lang iso",
@@ -250,29 +245,53 @@ func TestValidateCommand(t *testing.T) {
 				Token:     "token",
 				ProjectID: "project-id",
 			},
-			flags: &Flags{
-				Filename: "en.json",
-				LangISO:  "   ",
+			uploadCfg: &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("   "),
 			},
-			wantErr: "--lang-iso is required",
+			wantErr: "lang-iso is required",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateCommand(tt.cfg, tt.flags)
-			if tt.wantErr == "" && err != nil {
-				t.Fatalf("expected no error, got %v", err)
+			err := validateCommand(
+				tt.cfg,
+				tt.uploadCfg,
+			)
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
 			}
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error %q, got nil", tt.wantErr)
-				}
-				if err.Error() != tt.wantErr {
-					t.Fatalf("unexpected error: got %q, want %q", err.Error(), tt.wantErr)
-				}
-			}
+
+			require.EqualError(t, err, tt.wantErr)
 		})
+	}
+}
+
+func TestNewCommand_BindsFlags(t *testing.T) {
+	cmd := NewCommand(
+		&global_config.GlobalConfig{},
+		&appstate.State{},
+	)
+
+	for _, name := range []string{
+		"filename",
+		"src-path",
+		"lang-iso",
+		"poll",
+		"manifest",
+		"format",
+		"tags",
+		"filter-task-id",
+	} {
+		require.NotNilf(
+			t,
+			cmd.Flags().Lookup(name),
+			"expected flag %q to be registered",
+			name,
+		)
 	}
 }
 
@@ -286,48 +305,44 @@ func TestPerformUpload(t *testing.T) {
 		mu := &mockUploader{
 			result: "process-123",
 		}
-		flags := &Flags{
-			SrcPath: "./locales/en.json",
-			Poll:    true,
-		}
 
-		got, err := performUpload(context.Background(), mu, flags, params)
-		if err != nil {
-			t.Fatalf("performUpload() error = %v", err)
-		}
-		if got != "process-123" {
-			t.Fatalf("unexpected result: got %q", got)
-		}
-		if !mu.uploadCalled {
-			t.Fatal("expected Upload to be called")
-		}
-		if mu.gotSrcPath != "./locales/en.json" {
-			t.Fatalf("unexpected src path: got %q", mu.gotSrcPath)
-		}
-		if !mu.gotPoll {
-			t.Fatal("expected poll=true to be passed")
-		}
-		if mu.gotParams["filename"] != "en.json" {
-			t.Fatalf("unexpected params: %#v", mu.gotParams)
-		}
+		got, err := performUpload(
+			context.Background(),
+			mu,
+			params,
+			"./locales/en.json",
+			true,
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, "process-123", got)
+
+		require.True(t, mu.uploadCalled)
+		require.Equal(t, "./locales/en.json", mu.gotSrcPath)
+		require.True(t, mu.gotPoll)
+		require.Equal(t, "en.json", mu.gotParams["filename"])
 	})
 
 	t.Run("error", func(t *testing.T) {
+		wantErr := errors.New("upload failed")
+
 		mu := &mockUploader{
-			err: errors.New("upload failed"),
-		}
-		flags := &Flags{
-			SrcPath: "./locales/en.json",
-			Poll:    false,
+			err: wantErr,
 		}
 
-		_, err := performUpload(context.Background(), mu, flags, params)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "upload failed" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
+		_, err := performUpload(
+			context.Background(),
+			mu,
+			params,
+			"./locales/en.json",
+			false,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+
+		require.True(t, mu.uploadCalled)
+		require.Equal(t, "./locales/en.json", mu.gotSrcPath)
+		require.False(t, mu.gotPoll)
 	})
 }
 
@@ -378,16 +393,21 @@ func TestPrintUploadResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{Use: "test"}
+			cmd := &cobra.Command{
+				Use: "test",
+			}
+
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			cmd.SetErr(&out)
 
-			printUploadResult(cmd, tt.result, tt.poll)
+			printUploadResult(
+				cmd,
+				tt.result,
+				tt.poll,
+			)
 
-			if got := out.String(); got != tt.want {
-				t.Fatalf("unexpected output: got %q, want %q", got, tt.want)
-			}
+			require.Equal(t, tt.want, out.String())
 		})
 	}
 }
@@ -395,6 +415,7 @@ func TestPrintUploadResult(t *testing.T) {
 func TestRunCommand(t *testing.T) {
 	t.Run("happy path without poll", func(t *testing.T) {
 		old := newUploaderFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = old
 		})
@@ -402,7 +423,10 @@ func TestRunCommand(t *testing.T) {
 		mu := &mockUploader{
 			result: "process-123",
 		}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
@@ -410,50 +434,44 @@ func TestRunCommand(t *testing.T) {
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
-		flags.SrcPath = "./locales/en.json"
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--filename=en.json",
-			"--lang-iso=en",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
+		uploadCfg := &UploadConfig{
+			Filename: new("en.json"),
+			LangISO:  new("en"),
+			SrcPath:  new("./locales/en.json"),
+			Poll:     new(false),
 		}
+
+		cmd := &cobra.Command{Use: "upload"}
 
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		cmd.SetErr(&out)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err != nil {
-			t.Fatalf("runCommand() error = %v", err)
-		}
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+		require.NoError(t, err)
 
-		if !mu.uploadCalled {
-			t.Fatal("expected Upload to be called")
-		}
-		if mu.gotSrcPath != "./locales/en.json" {
-			t.Fatalf("unexpected src path: got %q", mu.gotSrcPath)
-		}
-		if mu.gotPoll {
-			t.Fatal("expected poll=false to be passed")
-		}
-		if mu.gotParams["filename"] != "en.json" {
-			t.Fatalf("unexpected params: %#v", mu.gotParams)
-		}
-		if mu.gotParams["lang_iso"] != "en" {
-			t.Fatalf("unexpected params: %#v", mu.gotParams)
-		}
+		require.True(t, mu.uploadCalled)
+		require.Equal(t, "./locales/en.json", mu.gotSrcPath)
+		require.False(t, mu.gotPoll)
 
-		gotOutput := out.String()
-		if !strings.Contains(gotOutput, "Upload started: process-123") {
-			t.Fatalf("unexpected output: %q", gotOutput)
-		}
+		require.Equal(t, "en.json", mu.gotParams["filename"])
+		require.Equal(t, "en", mu.gotParams["lang_iso"])
+
+		assert.Contains(
+			t,
+			out.String(),
+			"Upload started: process-123",
+		)
 	})
 
 	t.Run("happy path with poll", func(t *testing.T) {
 		old := newUploaderFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = old
 		})
@@ -461,7 +479,10 @@ func TestRunCommand(t *testing.T) {
 		mu := &mockUploader{
 			result: "bundle-456",
 		}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
@@ -469,131 +490,138 @@ func TestRunCommand(t *testing.T) {
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
-		flags.SrcPath = "./locales/en.json"
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--filename=en.json",
-			"--lang-iso=en",
-			"--poll",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
+		uploadCfg := &UploadConfig{
+			Filename: new("en.json"),
+			LangISO:  new("en"),
+			SrcPath:  new("./locales/en.json"),
+			Poll:     new(true),
 		}
+
+		cmd := &cobra.Command{Use: "upload"}
 
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		cmd.SetErr(&out)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err != nil {
-			t.Fatalf("runCommand() error = %v", err)
-		}
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+		require.NoError(t, err)
 
-		if !mu.uploadCalled {
-			t.Fatal("expected Upload to be called")
-		}
-		if !mu.gotPoll {
-			t.Fatal("expected poll=true to be passed")
-		}
+		require.True(t, mu.uploadCalled)
+		require.True(t, mu.gotPoll)
 
-		gotOutput := out.String()
-		if !strings.Contains(gotOutput, "Upload completed: bundle-456") {
-			t.Fatalf("unexpected output: %q", gotOutput)
-		}
+		assert.Contains(
+			t,
+			out.String(),
+			"Upload completed: bundle-456",
+		)
 	})
 
 	t.Run("build params error", func(t *testing.T) {
 		oldUploader := newUploaderFunc
 		oldBuildParams := buildParamsFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			buildParamsFunc = oldBuildParams
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
-		buildParamsFunc = func(cmd *cobra.Command, flags *Flags, defaults *UploadConfig) (lokexupload.UploadParams, error) {
-			return nil, errors.New("build params failed")
+		wantErr := errors.New("build params failed")
+
+		buildParamsFunc = func(
+			*UploadConfig,
+		) (lokexupload.UploadParams, error) {
+			return nil, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
-		flags.SrcPath = "./locales/en.json"
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--filename=en.json",
-			"--lang-iso=en",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
+		uploadCfg := &UploadConfig{
+			Filename: new("en.json"),
+			LangISO:  new("en"),
+			SrcPath:  new("./locales/en.json"),
 		}
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "build params failed" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
+		cmd := &cobra.Command{Use: "upload"}
 
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called")
-		}
-		if mu.batchCalled {
-			t.Fatal("expected UploadBatch not to be called")
-		}
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+		require.False(t, mu.uploadCalled)
+		require.False(t, mu.batchCalled)
 	})
 
 	t.Run("uploader factory error", func(t *testing.T) {
 		old := newUploaderFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = old
 		})
 
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
-			return nil, errors.New("cannot create uploader")
+		wantErr := errors.New("cannot create uploader")
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
+			return nil, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--filename=en.json",
-			"--lang-iso=en",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
+		uploadCfg := &UploadConfig{
+			Filename: new("en.json"),
+			LangISO:  new("en"),
 		}
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "cannot create uploader" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
+		cmd := &cobra.Command{Use: "upload"}
+
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+
+		require.ErrorIs(t, err, wantErr)
 	})
 
 	t.Run("upload error", func(t *testing.T) {
 		old := newUploaderFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = old
 		})
 
+		wantErr := errors.New("upload failed")
+
 		mu := &mockUploader{
-			err: errors.New("upload failed"),
+			err: wantErr,
 		}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
@@ -601,101 +629,94 @@ func TestRunCommand(t *testing.T) {
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
-		flags.SrcPath = "./locales/en.json"
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--filename=en.json",
-			"--lang-iso=en",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
+		uploadCfg := &UploadConfig{
+			Filename: new("en.json"),
+			LangISO:  new("en"),
+			SrcPath:  new("./locales/en.json"),
 		}
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "upload failed" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
+		cmd := &cobra.Command{Use: "upload"}
+
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+		require.True(t, mu.uploadCalled)
 	})
 }
 
-func TestNewCommand_PreRunE_UsesDefaults(t *testing.T) {
-	t.Parallel()
+func TestLoadUploadConfig_UsesConfigValues(t *testing.T) {
+	v := viper.New()
 
-	cfg := &global_config.GlobalConfig{
-		Token:     "token",
-		ProjectID: "project-id",
-	}
-	defaults := &UploadConfig{
-		Filename: new("en.json"),
-		LangISO:  new("en"),
+	v.Set("upload.filename", "en.json")
+	v.Set("upload.lang-iso", "en")
+
+	cmd := &cobra.Command{
+		Use: "upload",
 	}
 
-	cmd := NewCommand(cfg, defaults)
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("parse flags: %v", err)
-	}
+	params.BindFlags(
+		cmd,
+		uploadParamSpecs,
+	)
 
-	if err := cmd.PreRunE(cmd, nil); err != nil {
-		t.Fatalf("PreRunE() error = %v", err)
-	}
+	cfg := &UploadConfig{}
 
-	gotFilename, err := cmd.Flags().GetString("filename")
-	if err != nil {
-		t.Fatalf("GetString(filename): %v", err)
-	}
-	if gotFilename != "en.json" {
-		t.Fatalf("expected filename from defaults to be %q, got %q", "en.json", gotFilename)
-	}
+	err := LoadUploadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
 
-	gotLangISO, err := cmd.Flags().GetString("lang-iso")
-	if err != nil {
-		t.Fatalf("GetString(lang-iso): %v", err)
-	}
-	if gotLangISO != "en" {
-		t.Fatalf("expected lang-iso from defaults to be %q, got %q", "en", gotLangISO)
-	}
+	require.NotNil(t, cfg.Filename)
+	require.Equal(t, "en.json", *cfg.Filename)
+
+	require.NotNil(t, cfg.LangISO)
+	require.Equal(t, "en", *cfg.LangISO)
 }
 
-func TestNewCommand_PreRunE_ExplicitFlagsOverrideDefaults(t *testing.T) {
-	t.Parallel()
+func TestLoadUploadConfig_ExplicitFlagsOverrideConfig(t *testing.T) {
+	v := viper.New()
 
-	cfg := &global_config.GlobalConfig{
-		Token:     "token",
-		ProjectID: "project-id",
-	}
-	defaults := &UploadConfig{
-		Filename: new("default.json"),
-		LangISO:  new("fr"),
+	v.Set("upload.filename", "default.json")
+	v.Set("upload.lang-iso", "fr")
+
+	cmd := &cobra.Command{
+		Use: "upload",
 	}
 
-	cmd := NewCommand(cfg, defaults)
-	if err := cmd.ParseFlags([]string{"--filename=explicit.json", "--lang-iso=en"}); err != nil {
-		t.Fatalf("parse flags: %v", err)
-	}
+	params.BindFlags(
+		cmd,
+		uploadParamSpecs,
+	)
 
-	if err := cmd.PreRunE(cmd, nil); err != nil {
-		t.Fatalf("PreRunE() error = %v", err)
-	}
+	require.NoError(
+		t,
+		cmd.ParseFlags([]string{
+			"--filename=explicit.json",
+			"--lang-iso=en",
+		}),
+	)
 
-	gotFilename, err := cmd.Flags().GetString("filename")
-	if err != nil {
-		t.Fatalf("GetString(filename): %v", err)
-	}
-	if gotFilename != "explicit.json" {
-		t.Fatalf("expected explicit filename to win, got %q", gotFilename)
-	}
+	cfg := &UploadConfig{}
 
-	gotLangISO, err := cmd.Flags().GetString("lang-iso")
-	if err != nil {
-		t.Fatalf("GetString(lang-iso): %v", err)
-	}
-	if gotLangISO != "en" {
-		t.Fatalf("expected explicit lang-iso to win, got %q", gotLangISO)
-	}
+	err := LoadUploadConfig(
+		v,
+		cmd,
+		cfg,
+	)
+	require.NoError(t, err)
+
+	require.NotNil(t, cfg.Filename)
+	require.Equal(t, "explicit.json", *cfg.Filename)
+
+	require.NotNil(t, cfg.LangISO)
+	require.Equal(t, "en", *cfg.LangISO)
 }
 
 func TestRunCommand_PassesContextToUploader(t *testing.T) {
@@ -719,6 +740,7 @@ func TestRunCommand_PassesContextToUploader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			old := newUploaderFunc
+
 			t.Cleanup(func() {
 				newUploaderFunc = old
 			})
@@ -726,7 +748,10 @@ func TestRunCommand_PassesContextToUploader(t *testing.T) {
 			mu := &mockUploader{
 				result: "process-123",
 			}
-			newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+			newUploaderFunc = func(
+				*global_config.GlobalConfig,
+			) (uploader, error) {
 				return mu, nil
 			}
 
@@ -735,35 +760,38 @@ func TestRunCommand_PassesContextToUploader(t *testing.T) {
 				ProjectID:      "project-id",
 				ContextTimeout: tt.timeout,
 			}
-			flags := newFlags()
 
-			cmd := newBoundTestCommand(flags)
-			if err := cmd.Flags().Parse([]string{"--filename=en.json", "--lang-iso=en"}); err != nil {
-				t.Fatalf("parse flags: %v", err)
+			uploadCfg := &UploadConfig{
+				Filename: new("en.json"),
+				LangISO:  new("en"),
+			}
+
+			cmd := &cobra.Command{
+				Use: "upload",
 			}
 
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			cmd.SetErr(&out)
 
-			if err := runCommand(cmd, cfg, flags, nil); err != nil {
-				t.Fatalf("runCommand() error = %v", err)
-			}
+			err := runCommand(
+				cmd,
+				cfg,
+				uploadCfg,
+			)
+			require.NoError(t, err)
 
-			if mu.gotCtx == nil {
-				t.Fatal("expected context to be passed to uploader")
-			}
+			require.NotNil(t, mu.gotCtx)
 
 			_, gotDeadline := mu.gotCtx.Deadline()
-			if gotDeadline != tt.wantDeadline {
-				t.Fatalf("unexpected deadline presence: got %v, want %v", gotDeadline, tt.wantDeadline)
-			}
+			require.Equal(t, tt.wantDeadline, gotDeadline)
 		})
 	}
 }
 
-func TestRunCommand_UsesDefaultsInBuildParams(t *testing.T) {
+func TestRunCommand_UsesUploadConfigInBuildParams(t *testing.T) {
 	old := newUploaderFunc
+
 	t.Cleanup(func() {
 		newUploaderFunc = old
 	})
@@ -771,7 +799,10 @@ func TestRunCommand_UsesDefaultsInBuildParams(t *testing.T) {
 	mu := &mockUploader{
 		result: "process-123",
 	}
-	newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+	newUploaderFunc = func(
+		*global_config.GlobalConfig,
+	) (uploader, error) {
 		return mu, nil
 	}
 
@@ -779,44 +810,50 @@ func TestRunCommand_UsesDefaultsInBuildParams(t *testing.T) {
 		Token:     "token",
 		ProjectID: "project-id",
 	}
-	flags := newFlags()
 
-	defaults := &UploadConfig{
-		ApplyTM: new(true),
+	uploadCfg := &UploadConfig{
+		Filename: new("en.json"),
+		LangISO:  new("en"),
+		ApplyTM:  new(true),
 	}
 
-	cmd := newBoundTestCommand(flags)
-	if err := cmd.Flags().Parse([]string{"--filename=en.json", "--lang-iso=en"}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+	cmd := &cobra.Command{
+		Use: "upload",
 	}
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 
-	if err := runCommand(cmd, cfg, flags, defaults); err != nil {
-		t.Fatalf("runCommand() error = %v", err)
-	}
+	err := runCommand(
+		cmd,
+		cfg,
+		uploadCfg,
+	)
+	require.NoError(t, err)
 
 	got, ok := mu.gotParams["apply_tm"]
-	if !ok {
-		t.Fatal("expected apply_tm to be set from defaults")
-	}
-	if got != true {
-		t.Fatalf("expected apply_tm=true, got %#v", got)
-	}
+
+	require.True(t, ok)
+	require.Equal(t, true, got)
 }
 
 func TestRunCommand_UploadErrorDoesNotPrintSuccessOutput(t *testing.T) {
 	old := newUploaderFunc
+
 	t.Cleanup(func() {
 		newUploaderFunc = old
 	})
 
+	wantErr := errors.New("upload failed")
+
 	mu := &mockUploader{
-		err: errors.New("upload failed"),
+		err: wantErr,
 	}
-	newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+	newUploaderFunc = func(
+		*global_config.GlobalConfig,
+	) (uploader, error) {
 		return mu, nil
 	}
 
@@ -824,70 +861,35 @@ func TestRunCommand_UploadErrorDoesNotPrintSuccessOutput(t *testing.T) {
 		Token:     "token",
 		ProjectID: "project-id",
 	}
-	flags := newFlags()
 
-	cmd := newBoundTestCommand(flags)
-	if err := cmd.Flags().Parse([]string{"--filename=en.json", "--lang-iso=en"}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+	uploadCfg := &UploadConfig{
+		Filename: new("en.json"),
+		LangISO:  new("en"),
+	}
+
+	cmd := &cobra.Command{
+		Use: "upload",
 	}
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 
-	err := runCommand(cmd, cfg, flags, nil)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if err.Error() != "upload failed" {
-		t.Fatalf("unexpected error: %q", err.Error())
-	}
+	err := runCommand(
+		cmd,
+		cfg,
+		uploadCfg,
+	)
 
-	if strings.Contains(out.String(), "Upload started:") || strings.Contains(out.String(), "Upload completed:") {
-		t.Fatalf("did not expect success output on error, got %q", out.String())
-	}
+	require.ErrorIs(t, err, wantErr)
+
+	assert.NotContains(t, out.String(), "Upload started:")
+	assert.NotContains(t, out.String(), "Upload completed:")
 }
 
-func TestNewCommand_PreRunE_UsesDefaultsToPassValidation(t *testing.T) {
-	t.Parallel()
-
-	cfg := &global_config.GlobalConfig{
-		Token:     "token",
-		ProjectID: "project-id",
-	}
-	defaults := &UploadConfig{
-		Filename: new("en.json"),
-		LangISO:  new("en"),
-	}
-
-	cmd := NewCommand(cfg, defaults)
-	if err := cmd.ParseFlags([]string{}); err != nil {
-		t.Fatalf("parse flags: %v", err)
-	}
-
-	if err := cmd.PreRunE(cmd, nil); err != nil {
-		t.Fatalf("PreRunE() error = %v", err)
-	}
-
-	gotFilename, err := cmd.Flags().GetString("filename")
-	if err != nil {
-		t.Fatalf("GetString(filename): %v", err)
-	}
-	if gotFilename != "en.json" {
-		t.Fatalf("expected filename from defaults to be %q, got %q", "en.json", gotFilename)
-	}
-
-	gotLangISO, err := cmd.Flags().GetString("lang-iso")
-	if err != nil {
-		t.Fatalf("GetString(lang-iso): %v", err)
-	}
-	if gotLangISO != "en" {
-		t.Fatalf("expected lang-iso from defaults to be %q, got %q", "en", gotLangISO)
-	}
-}
-
-func TestNewCommand_Execute_UsesDefaultLocalOptions(t *testing.T) {
+func TestNewCommand_Execute_UsesConfigValues(t *testing.T) {
 	old := newUploaderFunc
+
 	t.Cleanup(func() {
 		newUploaderFunc = old
 	})
@@ -895,7 +897,10 @@ func TestNewCommand_Execute_UsesDefaultLocalOptions(t *testing.T) {
 	mu := &mockUploader{
 		result: "bundle-456",
 	}
-	newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+	newUploaderFunc = func(
+		*global_config.GlobalConfig,
+	) (uploader, error) {
 		return mu, nil
 	}
 
@@ -903,48 +908,60 @@ func TestNewCommand_Execute_UsesDefaultLocalOptions(t *testing.T) {
 		Token:     "token",
 		ProjectID: "project-id",
 	}
-	defaults := &UploadConfig{
-		Filename: new("en.json"),
-		LangISO:  new("en"),
-		SrcPath:  new("./locales/from-default.json"),
-		Poll:     new(true),
-	}
 
-	cmd := NewCommand(cfg, defaults)
-	cmd.SetArgs([]string{})
+	state := newUploadTestState(map[string]any{
+		"filename": "en.json",
+		"lang-iso": "en",
+		"src-path": "./locales/from-config.json",
+		"poll":     true,
+	})
+
+	cmd := NewCommand(
+		cfg,
+		state,
+	)
+
+	cmd.SetArgs(nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
+	err := cmd.Execute()
+	require.NoError(t, err)
 
-	if !mu.uploadCalled {
-		t.Fatal("expected Upload to be called")
-	}
-	if mu.gotSrcPath != "./locales/from-default.json" {
-		t.Fatalf("expected default src path to be used, got %q", mu.gotSrcPath)
-	}
-	if !mu.gotPoll {
-		t.Fatal("expected default poll=true to be used")
-	}
-	if got := mu.gotParams["filename"]; got != "en.json" {
-		t.Fatalf("unexpected filename param: got %#v", got)
-	}
-	if got := mu.gotParams["lang_iso"]; got != "en" {
-		t.Fatalf("unexpected lang_iso param: got %#v", got)
-	}
+	require.True(t, mu.uploadCalled)
 
-	gotOutput := out.String()
-	if !strings.Contains(gotOutput, "Upload completed: bundle-456") {
-		t.Fatalf("unexpected output: %q", gotOutput)
-	}
+	require.Equal(
+		t,
+		"./locales/from-config.json",
+		mu.gotSrcPath,
+	)
+
+	require.True(t, mu.gotPoll)
+
+	require.Equal(
+		t,
+		"en.json",
+		mu.gotParams["filename"],
+	)
+
+	require.Equal(
+		t,
+		"en",
+		mu.gotParams["lang_iso"],
+	)
+
+	assert.Contains(
+		t,
+		out.String(),
+		"Upload completed: bundle-456",
+	)
 }
 
-func TestNewCommand_Execute_ExplicitFlagsOverrideDefaultLocalOptions(t *testing.T) {
+func TestNewCommand_Execute_ExplicitFlagsOverrideConfig(t *testing.T) {
 	old := newUploaderFunc
+
 	t.Cleanup(func() {
 		newUploaderFunc = old
 	})
@@ -952,7 +969,10 @@ func TestNewCommand_Execute_ExplicitFlagsOverrideDefaultLocalOptions(t *testing.
 	mu := &mockUploader{
 		result: "process-123",
 	}
-	newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+	newUploaderFunc = func(
+		*global_config.GlobalConfig,
+	) (uploader, error) {
 		return mu, nil
 	}
 
@@ -960,14 +980,19 @@ func TestNewCommand_Execute_ExplicitFlagsOverrideDefaultLocalOptions(t *testing.
 		Token:     "token",
 		ProjectID: "project-id",
 	}
-	defaults := &UploadConfig{
-		Filename: new("default.json"),
-		LangISO:  new("fr"),
-		SrcPath:  new("./locales/from-default.json"),
-		Poll:     new(true),
-	}
 
-	cmd := NewCommand(cfg, defaults)
+	state := newUploadTestState(map[string]any{
+		"filename": "default.json",
+		"lang-iso": "fr",
+		"src-path": "./locales/from-config.json",
+		"poll":     true,
+	})
+
+	cmd := NewCommand(
+		cfg,
+		state,
+	)
+
 	cmd.SetArgs([]string{
 		"--filename=explicit.json",
 		"--lang-iso=en",
@@ -979,34 +1004,46 @@ func TestNewCommand_Execute_ExplicitFlagsOverrideDefaultLocalOptions(t *testing.
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
+	err := cmd.Execute()
+	require.NoError(t, err)
 
-	if !mu.uploadCalled {
-		t.Fatal("expected Upload to be called")
-	}
-	if mu.gotSrcPath != "./locales/explicit.json" {
-		t.Fatalf("expected explicit src path to win, got %q", mu.gotSrcPath)
-	}
-	if mu.gotPoll {
-		t.Fatal("expected explicit poll=false to win")
-	}
-	if got := mu.gotParams["filename"]; got != "explicit.json" {
-		t.Fatalf("unexpected filename param: got %#v", got)
-	}
-	if got := mu.gotParams["lang_iso"]; got != "en" {
-		t.Fatalf("unexpected lang_iso param: got %#v", got)
-	}
+	require.True(t, mu.uploadCalled)
 
-	gotOutput := out.String()
-	if !strings.Contains(gotOutput, "Upload started: process-123") {
-		t.Fatalf("unexpected output: %q", gotOutput)
-	}
+	require.Equal(
+		t,
+		"./locales/explicit.json",
+		mu.gotSrcPath,
+	)
+
+	require.False(t, mu.gotPoll)
+
+	require.Equal(
+		t,
+		"explicit.json",
+		mu.gotParams["filename"],
+	)
+
+	require.Equal(
+		t,
+		"en",
+		mu.gotParams["lang_iso"],
+	)
+
+	assert.Contains(
+		t,
+		out.String(),
+		"Upload started: process-123",
+	)
 }
 
-func newBoundTestCommand(flags *Flags) *cobra.Command {
-	cmd := &cobra.Command{Use: "test"}
-	bindFlags(cmd, flags)
-	return cmd
+func newUploadTestState(values map[string]any) *appstate.State {
+	v := viper.New()
+
+	for key, value := range values {
+		v.Set("upload."+key, value)
+	}
+
+	return &appstate.State{
+		Viper: v,
+	}
 }

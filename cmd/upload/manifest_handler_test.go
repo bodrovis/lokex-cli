@@ -3,18 +3,15 @@ package upload
 import (
 	"bytes"
 	"context"
-	"encoding/json/jsontext"
 	"errors"
-	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"github.com/spf13/cobra"
 
 	"github.com/bodrovis/lokex-cli/internal/global_config"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPerformBatchUpload(t *testing.T) {
@@ -52,61 +49,46 @@ func TestPerformBatchUpload(t *testing.T) {
 				},
 			},
 		}
-		flags := &Flags{
-			Poll: true,
-		}
 
-		got, err := performBatchUpload(context.Background(), mu, flags, items)
-		if err != nil {
-			t.Fatalf("performBatchUpload() error = %v", err)
-		}
-		if !mu.batchCalled {
-			t.Fatal("expected UploadBatch to be called")
-		}
-		if mu.gotBatchCtx == nil {
-			t.Fatal("expected context to be passed")
-		}
-		if !mu.gotBatchPoll {
-			t.Fatal("expected poll=true to be passed")
-		}
-		if len(mu.gotBatchItems) != 2 {
-			t.Fatalf("unexpected batch items len: got %d, want 2", len(mu.gotBatchItems))
-		}
-		if mu.gotBatchItems[0].SrcPath != "./locales/en.json" {
-			t.Fatalf("unexpected first src path: got %q", mu.gotBatchItems[0].SrcPath)
-		}
-		if mu.gotBatchItems[1].Params["lang_iso"] != "de" {
-			t.Fatalf("unexpected second params: %#v", mu.gotBatchItems[1].Params)
-		}
-		if len(got.Items) != 2 {
-			t.Fatalf("unexpected result items len: got %d, want 2", len(got.Items))
-		}
-		if got.Items[0].ProcessID != "process-1" {
-			t.Fatalf("unexpected first process id: got %q", got.Items[0].ProcessID)
-		}
+		got, err := performBatchUpload(
+			context.Background(),
+			mu,
+			true,
+			items,
+		)
+
+		require.NoError(t, err)
+
+		require.True(t, mu.batchCalled)
+		require.NotNil(t, mu.gotBatchCtx)
+		require.True(t, mu.gotBatchPoll)
+
+		require.Len(t, mu.gotBatchItems, 2)
+		assert.Equal(t, "./locales/en.json", mu.gotBatchItems[0].SrcPath)
+		assert.Equal(t, "de", mu.gotBatchItems[1].Params["lang_iso"])
+
+		require.Len(t, got.Items, 2)
+		assert.Equal(t, "process-1", got.Items[0].ProcessID)
 	})
 
 	t.Run("error", func(t *testing.T) {
+		wantErr := errors.New("batch upload failed")
+
 		mu := &mockUploader{
-			batchErr: errors.New("batch upload failed"),
-		}
-		flags := &Flags{
-			Poll: false,
+			batchErr: wantErr,
 		}
 
-		_, err := performBatchUpload(context.Background(), mu, flags, items)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "batch upload failed" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-		if !mu.batchCalled {
-			t.Fatal("expected UploadBatch to be called")
-		}
-		if mu.gotBatchPoll {
-			t.Fatal("expected poll=false to be passed")
-		}
+		_, err := performBatchUpload(
+			context.Background(),
+			mu,
+			false,
+			items,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+
+		require.True(t, mu.batchCalled)
+		require.False(t, mu.gotBatchPoll)
 	})
 }
 
@@ -116,6 +98,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		oldLoad := loadManifestFileFunc
 		oldBuild := buildBatchUploadItemsFunc
 		oldPerform := performBatchUploadFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			loadManifestFileFunc = oldLoad
@@ -124,14 +107,16 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
 		loadManifestFileFunc = func(path string) (manifestFile, error) {
-			if path != "./manifest.json" {
-				t.Fatalf("unexpected manifest path: %q", path)
-			}
+			require.Equal(t, "./manifest.json", path)
+
 			return manifestFile{
 				Items: []manifestItem{
 					{
@@ -145,13 +130,13 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			}, nil
 		}
 
-		buildBatchUploadItemsFunc = func(manifestPath string, mf manifestFile) ([]lokexupload.BatchUploadItem, error) {
-			if manifestPath != "./manifest.json" {
-				t.Fatalf("unexpected manifest path: %q", manifestPath)
-			}
-			if len(mf.Items) != 1 {
-				t.Fatalf("unexpected manifest items len: %d", len(mf.Items))
-			}
+		buildBatchUploadItemsFunc = func(
+			manifestPath string,
+			mf manifestFile,
+		) ([]lokexupload.BatchUploadItem, error) {
+			require.Equal(t, "./manifest.json", manifestPath)
+			require.Len(t, mf.Items, 1)
+
 			return []lokexupload.BatchUploadItem{
 				{
 					Params: lokexupload.UploadParams{
@@ -166,21 +151,13 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		performBatchUploadFunc = func(
 			ctx context.Context,
 			up uploader,
-			flags *Flags,
+			poll bool,
 			items []lokexupload.BatchUploadItem,
 		) (lokexupload.BatchUploadResult, error) {
-			if up != mu {
-				t.Fatal("expected mock uploader to be passed")
-			}
-			if flags.Manifest != "./manifest.json" {
-				t.Fatalf("unexpected manifest flag: %q", flags.Manifest)
-			}
-			if flags.Poll {
-				t.Fatal("expected poll=false")
-			}
-			if len(items) != 1 {
-				t.Fatalf("unexpected items len: %d", len(items))
-			}
+			require.NotNil(t, ctx)
+			require.Equal(t, mu, up)
+			require.False(t, poll)
+			require.Len(t, items, 1)
 
 			return lokexupload.BatchUploadResult{
 				Items: []lokexupload.BatchUploadResultItem{
@@ -197,35 +174,38 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--manifest=./manifest.json",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
-		}
+		uploadCfg := newManifestUploadConfig(
+			"./manifest.json",
+			false,
+		)
+
+		cmd := &cobra.Command{Use: "upload"}
 
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		cmd.SetErr(&out)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err != nil {
-			t.Fatalf("runCommand() error = %v", err)
-		}
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+		require.NoError(t, err)
 
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called in manifest mode")
-		}
+		require.False(t, mu.uploadCalled)
 
-		gotOutput := out.String()
-		if !strings.Contains(gotOutput, `Upload started: index=0 src="./locales/en.json" process_id=batch-123`) {
-			t.Fatalf("unexpected output: %q", gotOutput)
-		}
-		if !strings.Contains(gotOutput, "Batch summary: total=1 success=1 failed=0") {
-			t.Fatalf("unexpected output: %q", gotOutput)
-		}
+		assert.Contains(
+			t,
+			out.String(),
+			`Upload started: index=0 src="./locales/en.json" process_id=batch-123`,
+		)
+
+		assert.Contains(
+			t,
+			out.String(),
+			"Batch summary: total=1 success=1 failed=0",
+		)
 	})
 
 	t.Run("happy path with poll", func(t *testing.T) {
@@ -233,6 +213,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		oldLoad := loadManifestFileFunc
 		oldBuild := buildBatchUploadItemsFunc
 		oldPerform := performBatchUploadFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			loadManifestFileFunc = oldLoad
@@ -241,11 +222,14 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(path string) (manifestFile, error) {
+		loadManifestFileFunc = func(string) (manifestFile, error) {
 			return manifestFile{
 				Items: []manifestItem{
 					{
@@ -259,7 +243,10 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			}, nil
 		}
 
-		buildBatchUploadItemsFunc = func(manifestPath string, mf manifestFile) ([]lokexupload.BatchUploadItem, error) {
+		buildBatchUploadItemsFunc = func(
+			string,
+			manifestFile,
+		) ([]lokexupload.BatchUploadItem, error) {
 			return []lokexupload.BatchUploadItem{
 				{
 					Params: lokexupload.UploadParams{
@@ -272,14 +259,12 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		}
 
 		performBatchUploadFunc = func(
-			ctx context.Context,
-			up uploader,
-			flags *Flags,
-			items []lokexupload.BatchUploadItem,
+			_ context.Context,
+			_ uploader,
+			poll bool,
+			_ []lokexupload.BatchUploadItem,
 		) (lokexupload.BatchUploadResult, error) {
-			if !flags.Poll {
-				t.Fatal("expected poll=true")
-			}
+			require.True(t, poll)
 
 			return lokexupload.BatchUploadResult{
 				Items: []lokexupload.BatchUploadResultItem{
@@ -296,102 +281,100 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--manifest=./manifest.json",
-			"--poll",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
-		}
+		uploadCfg := newManifestUploadConfig(
+			"./manifest.json",
+			true,
+		)
+
+		cmd := &cobra.Command{Use: "upload"}
 
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		cmd.SetErr(&out)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err != nil {
-			t.Fatalf("runCommand() error = %v", err)
-		}
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+		require.NoError(t, err)
 
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called in manifest mode")
-		}
+		require.False(t, mu.uploadCalled)
 
-		gotOutput := out.String()
-		if !strings.Contains(gotOutput, `Upload completed: index=0 src="./locales/de.json" process_id=batch-456`) {
-			t.Fatalf("unexpected output: %q", gotOutput)
-		}
+		assert.Contains(
+			t,
+			out.String(),
+			`Upload completed: index=0 src="./locales/de.json" process_id=batch-456`,
+		)
 	})
 
 	t.Run("manifest load error", func(t *testing.T) {
 		oldUploader := newUploaderFunc
 		oldLoad := loadManifestFileFunc
-		oldBuild := buildBatchUploadItemsFunc
-		oldPerform := performBatchUploadFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			loadManifestFileFunc = oldLoad
-			buildBatchUploadItemsFunc = oldBuild
-			performBatchUploadFunc = oldPerform
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(path string) (manifestFile, error) {
-			return manifestFile{}, errors.New("bad manifest")
+		wantErr := errors.New("bad manifest")
+
+		loadManifestFileFunc = func(string) (manifestFile, error) {
+			return manifestFile{}, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--manifest=./manifest.json",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
-		}
+		uploadCfg := newManifestUploadConfig(
+			"./manifest.json",
+			false,
+		)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "bad manifest" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called")
-		}
-		if mu.batchCalled {
-			t.Fatal("expected UploadBatch not to be called")
-		}
+		cmd := &cobra.Command{Use: "upload"}
+
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+		require.False(t, mu.uploadCalled)
+		require.False(t, mu.batchCalled)
 	})
 
 	t.Run("build batch items error", func(t *testing.T) {
 		oldUploader := newUploaderFunc
 		oldLoad := loadManifestFileFunc
 		oldBuild := buildBatchUploadItemsFunc
-		oldPerform := performBatchUploadFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			loadManifestFileFunc = oldLoad
 			buildBatchUploadItemsFunc = oldBuild
-			performBatchUploadFunc = oldPerform
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(path string) (manifestFile, error) {
+		loadManifestFileFunc = func(string) (manifestFile, error) {
 			return manifestFile{
 				Items: []manifestItem{
 					{
@@ -404,36 +387,36 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			}, nil
 		}
 
-		buildBatchUploadItemsFunc = func(manifestPath string, mf manifestFile) ([]lokexupload.BatchUploadItem, error) {
-			return nil, errors.New("invalid manifest item")
+		wantErr := errors.New("invalid manifest item")
+
+		buildBatchUploadItemsFunc = func(
+			string,
+			manifestFile,
+		) ([]lokexupload.BatchUploadItem, error) {
+			return nil, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--manifest=./manifest.json",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
-		}
+		uploadCfg := newManifestUploadConfig(
+			"./manifest.json",
+			false,
+		)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != "invalid manifest item" {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called")
-		}
-		if mu.batchCalled {
-			t.Fatal("expected UploadBatch not to be called")
-		}
+		cmd := &cobra.Command{Use: "upload"}
+
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
+
+		require.ErrorIs(t, err, wantErr)
+		require.False(t, mu.uploadCalled)
+		require.False(t, mu.batchCalled)
 	})
 
 	t.Run("batch upload error", func(t *testing.T) {
@@ -441,6 +424,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		oldLoad := loadManifestFileFunc
 		oldBuild := buildBatchUploadItemsFunc
 		oldPerform := performBatchUploadFunc
+
 		t.Cleanup(func() {
 			newUploaderFunc = oldUploader
 			loadManifestFileFunc = oldLoad
@@ -449,11 +433,14 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		})
 
 		mu := &mockUploader{}
-		newUploaderFunc = func(cfg *global_config.GlobalConfig) (uploader, error) {
+
+		newUploaderFunc = func(
+			*global_config.GlobalConfig,
+		) (uploader, error) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(path string) (manifestFile, error) {
+		loadManifestFileFunc = func(string) (manifestFile, error) {
 			return manifestFile{
 				Items: []manifestItem{
 					{
@@ -467,7 +454,10 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			}, nil
 		}
 
-		buildBatchUploadItemsFunc = func(manifestPath string, mf manifestFile) ([]lokexupload.BatchUploadItem, error) {
+		buildBatchUploadItemsFunc = func(
+			string,
+			manifestFile,
+		) ([]lokexupload.BatchUploadItem, error) {
 			return []lokexupload.BatchUploadItem{
 				{
 					Params: lokexupload.UploadParams{
@@ -479,229 +469,47 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			}, nil
 		}
 
+		wantErr := errors.New("batch upload failed")
+
 		performBatchUploadFunc = func(
-			ctx context.Context,
-			up uploader,
-			flags *Flags,
-			items []lokexupload.BatchUploadItem,
+			context.Context,
+			uploader,
+			bool,
+			[]lokexupload.BatchUploadItem,
 		) (lokexupload.BatchUploadResult, error) {
-			return lokexupload.BatchUploadResult{}, errors.New("batch upload failed")
+			return lokexupload.BatchUploadResult{}, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
 			Token:     "token",
 			ProjectID: "project-id",
 		}
-		flags := newFlags()
 
-		cmd := newBoundTestCommand(flags)
-		if err := cmd.Flags().Parse([]string{
-			"--manifest=./manifest.json",
-		}); err != nil {
-			t.Fatalf("parse flags: %v", err)
-		}
+		uploadCfg := newManifestUploadConfig(
+			"./manifest.json",
+			false,
+		)
 
-		err := runCommand(cmd, cfg, flags, nil)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if err.Error() != `upload batch from manifest "./manifest.json": batch upload failed` {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-		if mu.uploadCalled {
-			t.Fatal("expected Upload not to be called")
-		}
-	})
-}
+		cmd := &cobra.Command{Use: "upload"}
 
-func TestLoadManifestFile(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "manifest.json")
+		err := runCommand(
+			cmd,
+			cfg,
+			uploadCfg,
+		)
 
-		content := `{
-			"items": [
-				{
-					"params": {
-						"filename": "locales/en.json",
-						"lang_iso": "en"
-					}
-				},
-				{
-					"params": {
-						"filename": "locales/de.json",
-						"lang_iso": "de"
-					},
-					"src_path": "./de.json"
-				}
-			]
-		}`
+		require.EqualError(
+			t,
+			err,
+			`upload batch from manifest "./manifest.json": batch upload failed`,
+		)
 
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-
-		got, err := loadManifestFile(path)
-		if err != nil {
-			t.Fatalf("loadManifestFile() error = %v", err)
-		}
-
-		if len(got.Items) != 2 {
-			t.Fatalf("unexpected items len: got %d, want 2", len(got.Items))
-		}
-		if got.Items[0].Params["filename"] != "locales/en.json" {
-			t.Fatalf("unexpected first filename: %#v", got.Items[0].Params)
-		}
-		if got.Items[1].Params["lang_iso"] != "de" {
-			t.Fatalf("unexpected second lang_iso: %#v", got.Items[1].Params)
-		}
-		if got.Items[1].SrcPath != "./de.json" {
-			t.Fatalf("unexpected second src_path: got %q", got.Items[1].SrcPath)
-		}
-	})
-
-	t.Run("preserves numeric params as jsontext.Value", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "manifest.json")
-
-		content := `{
-		"items": [
-			{
-				"params": {
-					"filename": "locales/en.json",
-					"lang_iso": "en",
-					"filter_task_id": 1234567890123456789
-				},
-				"src_path": "./en.json"
-			}
-		]
-	}`
-
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-
-		got, err := loadManifestFile(path)
-		if err != nil {
-			t.Fatalf("loadManifestFile() error = %v", err)
-		}
-
-		if len(got.Items) != 1 {
-			t.Fatalf("unexpected items len: got %d, want 1", len(got.Items))
-		}
-
-		raw := got.Items[0].Params["filter_task_id"]
-
-		num, ok := raw.(jsontext.Value)
-		if !ok {
-			t.Fatalf(
-				"expected filter_task_id to be jsontext.Value, got %T (%#v)",
-				raw,
-				raw,
-			)
-		}
-
-		if num.Kind() != jsontext.KindNumber {
-			t.Fatalf(
-				"expected filter_task_id to be JSON number, got kind %v",
-				num.Kind(),
-			)
-		}
-
-		if num.String() != "1234567890123456789" {
-			t.Fatalf(
-				"unexpected filter_task_id: got %q",
-				num.String(),
-			)
-		}
-	})
-
-	t.Run("file does not exist", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "missing.json")
-
-		_, err := loadManifestFile(path)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), `read manifest file "`) {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-		if !strings.Contains(err.Error(), `missing.json`) {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-	})
-
-	t.Run("invalid json", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "manifest.json")
-
-		content := `{
-			"items": [
-				{
-					"params": {
-						"filename": "locales/en.json",
-						"lang_iso": "en"
-					}
-				}
-			`
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-
-		_, err := loadManifestFile(path)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), `parse manifest file "`) {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-	})
-
-	t.Run("empty items", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "manifest.json")
-
-		content := `{
-			"items": []
-		}`
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-
-		_, err := loadManifestFile(path)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := fmt.Sprintf("manifest file %q contains no items", path)
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("missing items field", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "manifest.json")
-
-		content := `{
-			"foo": "bar"
-		}`
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("write manifest: %v", err)
-		}
-
-		_, err := loadManifestFile(path)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := fmt.Sprintf("manifest file %q contains no items", path)
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
+		require.False(t, mu.uploadCalled)
 	})
 }
 
 func TestBuildBatchUploadItems(t *testing.T) {
-	t.Run("ok with relative src_path", func(t *testing.T) {
+	t.Run("relative src_path is resolved against manifest directory", func(t *testing.T) {
 		mf := manifestFile{
 			Items: []manifestItem{
 				{
@@ -714,23 +522,25 @@ func TestBuildBatchUploadItems(t *testing.T) {
 			},
 		}
 
-		items, err := buildBatchUploadItems("/configs/manifest.json", mf)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		items, err := buildBatchUploadItems(
+			"/configs/manifest.json",
+			mf,
+		)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
 
-		if len(items) != 1 {
-			t.Fatalf("unexpected items len: %d", len(items))
-		}
-
-		wantPath := filepath.Join("/configs", "en.json")
-		if items[0].SrcPath != wantPath {
-			t.Fatalf("unexpected src path: got %q, want %q", items[0].SrcPath, wantPath)
-		}
+		assert.Equal(
+			t,
+			filepath.Join("/configs", "en.json"),
+			items[0].SrcPath,
+		)
 	})
 
-	t.Run("ok with absolute src_path", func(t *testing.T) {
-		absPath := filepath.Join(t.TempDir(), "en.json")
+	t.Run("absolute src_path is preserved", func(t *testing.T) {
+		absPath := filepath.Join(
+			t.TempDir(),
+			"en.json",
+		)
 
 		mf := manifestFile{
 			Items: []manifestItem{
@@ -744,17 +554,17 @@ func TestBuildBatchUploadItems(t *testing.T) {
 			},
 		}
 
-		items, err := buildBatchUploadItems(filepath.Join("configs", "manifest.json"), mf)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		items, err := buildBatchUploadItems(
+			filepath.Join("configs", "manifest.json"),
+			mf,
+		)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
 
-		if items[0].SrcPath != absPath {
-			t.Fatalf("unexpected src path: got %q, want %q", items[0].SrcPath, absPath)
-		}
+		assert.Equal(t, absPath, items[0].SrcPath)
 	})
 
-	t.Run("ok without src_path", func(t *testing.T) {
+	t.Run("empty src_path is preserved", func(t *testing.T) {
 		mf := manifestFile{
 			Items: []manifestItem{
 				{
@@ -766,248 +576,72 @@ func TestBuildBatchUploadItems(t *testing.T) {
 			},
 		}
 
-		items, err := buildBatchUploadItems("/configs/manifest.json", mf)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		items, err := buildBatchUploadItems(
+			"/configs/manifest.json",
+			mf,
+		)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
 
-		if items[0].SrcPath != "" {
-			t.Fatalf("expected empty src path, got %q", items[0].SrcPath)
-		}
+		assert.Empty(t, items[0].SrcPath)
 	})
 
-	t.Run("error missing filename", func(t *testing.T) {
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"lang_iso": "en",
-					},
-				},
+	tests := []struct {
+		name   string
+		params lokexupload.UploadParams
+		want   string
+	}{
+		{
+			name: "missing filename",
+			params: lokexupload.UploadParams{
+				"lang_iso": "en",
 			},
-		}
-
-		_, err := buildBatchUploadItems("/configs/manifest.json", mf)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "params.filename is required") {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-	})
-
-	t.Run("error missing lang_iso", func(t *testing.T) {
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"filename": "locales/en.json",
-					},
-				},
+			want: "params.filename is required",
+		},
+		{
+			name: "missing lang_iso",
+			params: lokexupload.UploadParams{
+				"filename": "locales/en.json",
 			},
-		}
-
-		_, err := buildBatchUploadItems("/configs/manifest.json", mf)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "params.lang_iso is required") {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-	})
-
-	t.Run("error whitespace values", func(t *testing.T) {
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"filename": "   ",
-						"lang_iso": "   ",
-					},
-				},
+			want: "params.lang_iso is required",
+		},
+		{
+			name: "whitespace filename",
+			params: lokexupload.UploadParams{
+				"filename": "   ",
+				"lang_iso": "en",
 			},
-		}
-
-		_, err := buildBatchUploadItems("/configs/manifest.json", mf)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "params.filename is required") &&
-			!strings.Contains(err.Error(), "params.lang_iso is required") {
-			t.Fatalf("unexpected error: %q", err.Error())
-		}
-	})
-}
-
-func TestPrintBatchItemResult(t *testing.T) {
-	t.Run("prints failed item", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		item := lokexupload.BatchUploadResultItem{
-			Index:   2,
-			SrcPath: "./locales/de.json",
-			Err:     errors.New("boom"),
-		}
-
-		printBatchItemResult(cmd, item, false)
-
-		got := out.String()
-		want := "Upload failed: index=2 src=\"./locales/de.json\" err=boom\n"
-		if got != want {
-			t.Fatalf("unexpected output:\n got: %q\nwant: %q", got, want)
-		}
-	})
-
-	t.Run("prints started item when poll is false", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		item := lokexupload.BatchUploadResultItem{
-			Index:     0,
-			SrcPath:   "./locales/en.json",
-			ProcessID: "process-123",
-		}
-
-		printBatchItemResult(cmd, item, false)
-
-		got := out.String()
-		want := "Upload started: index=0 src=\"./locales/en.json\" process_id=process-123\n"
-		if got != want {
-			t.Fatalf("unexpected output:\n got: %q\nwant: %q", got, want)
-		}
-	})
-
-	t.Run("prints completed item when poll is true", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		item := lokexupload.BatchUploadResultItem{
-			Index:     1,
-			SrcPath:   "./locales/fr.json",
-			ProcessID: "process-456",
-		}
-
-		printBatchItemResult(cmd, item, true)
-
-		got := out.String()
-		want := "Upload completed: index=1 src=\"./locales/fr.json\" process_id=process-456\n"
-		if got != want {
-			t.Fatalf("unexpected output:\n got: %q\nwant: %q", got, want)
-		}
-	})
-}
-
-func TestPrintBatchSummary(t *testing.T) {
-	cmd := &cobra.Command{}
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&out)
-
-	printBatchSummary(cmd, 3, 2, 1)
-
-	got := out.String()
-	want := "Batch summary: total=3 success=2 failed=1\n"
-	if got != want {
-		t.Fatalf("unexpected output:\n got: %q\nwant: %q", got, want)
+			want: "params.filename is required",
+		},
+		{
+			name: "whitespace lang_iso",
+			params: lokexupload.UploadParams{
+				"filename": "locales/en.json",
+				"lang_iso": "   ",
+			},
+			want: "params.lang_iso is required",
+		},
 	}
-}
 
-func TestPrintBatchUploadResult(t *testing.T) {
-	t.Run("prints started items and summary when poll is false", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		result := lokexupload.BatchUploadResult{
-			Items: []lokexupload.BatchUploadResultItem{
-				{
-					Index:     0,
-					SrcPath:   "./locales/en.json",
-					ProcessID: "process-1",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mf := manifestFile{
+				Items: []manifestItem{
+					{
+						Params: tt.params,
+					},
 				},
-				{
-					Index:   1,
-					SrcPath: "./locales/de.json",
-					Err:     errors.New("failed upload"),
-				},
-			},
-		}
+			}
 
-		printBatchUploadResult(cmd, result, false)
+			_, err := buildBatchUploadItems(
+				"/configs/manifest.json",
+				mf,
+			)
 
-		got := out.String()
-
-		if !strings.Contains(got, `Upload started: index=0 src="./locales/en.json" process_id=process-1`) {
-			t.Fatalf("unexpected output: %q", got)
-		}
-		if !strings.Contains(got, `Upload failed: index=1 src="./locales/de.json" err=failed upload`) {
-			t.Fatalf("unexpected output: %q", got)
-		}
-		if !strings.Contains(got, "Batch summary: total=2 success=1 failed=1") {
-			t.Fatalf("unexpected output: %q", got)
-		}
-	})
-
-	t.Run("prints completed items and summary when poll is true", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		result := lokexupload.BatchUploadResult{
-			Items: []lokexupload.BatchUploadResultItem{
-				{
-					Index:     0,
-					SrcPath:   "./locales/en.json",
-					ProcessID: "process-1",
-				},
-				{
-					Index:     1,
-					SrcPath:   "./locales/fr.json",
-					ProcessID: "process-2",
-				},
-			},
-		}
-
-		printBatchUploadResult(cmd, result, true)
-
-		got := out.String()
-
-		if !strings.Contains(got, `Upload completed: index=0 src="./locales/en.json" process_id=process-1`) {
-			t.Fatalf("unexpected output: %q", got)
-		}
-		if !strings.Contains(got, `Upload completed: index=1 src="./locales/fr.json" process_id=process-2`) {
-			t.Fatalf("unexpected output: %q", got)
-		}
-		if !strings.Contains(got, "Batch summary: total=2 success=2 failed=0") {
-			t.Fatalf("unexpected output: %q", got)
-		}
-	})
-
-	t.Run("prints summary for empty result", func(t *testing.T) {
-		cmd := &cobra.Command{}
-		var out bytes.Buffer
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-
-		result := lokexupload.BatchUploadResult{}
-
-		printBatchUploadResult(cmd, result, false)
-
-		got := out.String()
-		want := "Batch summary: total=0 success=0 failed=0\n"
-		if got != want {
-			t.Fatalf("unexpected output:\n got: %q\nwant: %q", got, want)
-		}
-	})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.want)
+		})
+	}
 }
 
 func TestRequiredManifestString(t *testing.T) {
@@ -1199,4 +833,14 @@ func TestValidateManifestItem(t *testing.T) {
 			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
 		}
 	})
+}
+
+func newManifestUploadConfig(
+	path string,
+	poll bool,
+) *UploadConfig {
+	return &UploadConfig{
+		Manifest: &path,
+		Poll:     &poll,
+	}
 }

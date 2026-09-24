@@ -13,7 +13,10 @@ var (
 	userHomeDir   = os.UserHomeDir
 )
 
-func NewConfigViper(configFile, envPrefix string) *viper.Viper {
+func NewConfigViper(
+	configFile string,
+	envPrefix string,
+) *viper.Viper {
 	v := viper.New()
 
 	configFile = strings.TrimSpace(configFile)
@@ -26,10 +29,16 @@ func NewConfigViper(configFile, envPrefix string) *viper.Viper {
 		v.SetConfigType("yaml")
 		v.AddConfigPath(".")
 
-		if configDir, err := userConfigDir(); err == nil && strings.TrimSpace(configDir) != "" {
-			v.AddConfigPath(filepath.Join(configDir, "lokex-cli"))
-		} else if home, err := userHomeDir(); err == nil && strings.TrimSpace(home) != "" {
-			v.AddConfigPath(filepath.Join(home, ".config", "lokex-cli"))
+		if configDir, err := userConfigDir(); err == nil &&
+			strings.TrimSpace(configDir) != "" {
+			v.AddConfigPath(
+				filepath.Join(configDir, "lokex-cli"),
+			)
+		} else if home, err := userHomeDir(); err == nil &&
+			strings.TrimSpace(home) != "" {
+			v.AddConfigPath(
+				filepath.Join(home, ".config", "lokex-cli"),
+			)
 		}
 	}
 
@@ -37,7 +46,13 @@ func NewConfigViper(configFile, envPrefix string) *viper.Viper {
 		v.SetEnvPrefix(envPrefix)
 	}
 
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+	v.SetEnvKeyReplacer(
+		strings.NewReplacer(
+			"-", "_",
+			".", "_",
+		),
+	)
+
 	v.AutomaticEnv()
 
 	return v
