@@ -6,7 +6,6 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -15,15 +14,6 @@ import (
 	"github.com/bodrovis/lokex-cli/internal/ptrutil"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
 )
-
-type manifestFile struct {
-	Items []manifestItem `json:"items"`
-}
-
-type manifestItem struct {
-	Params  lokexupload.UploadParams `json:"params"`
-	SrcPath string                   `json:"src_path"`
-}
 
 var (
 	loadManifestFileFunc      = loadManifestFile
@@ -88,41 +78,6 @@ func runManifestCommand(
 	return nil
 }
 
-func loadManifestFile(path string) (manifestFile, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return manifestFile{}, fmt.Errorf(
-			"read manifest file %q: %w",
-			path,
-			err,
-		)
-	}
-	defer func() { _ = f.Close() }()
-
-	var mf manifestFile
-
-	if err := json.UnmarshalRead(
-		f,
-		&mf,
-		preserveJSONNumbers,
-	); err != nil {
-		return manifestFile{}, fmt.Errorf(
-			"parse manifest file %q: %w",
-			path,
-			err,
-		)
-	}
-
-	if len(mf.Items) == 0 {
-		return manifestFile{}, fmt.Errorf(
-			"manifest file %q contains no items",
-			path,
-		)
-	}
-
-	return mf, nil
-}
-
 func buildBatchUploadItems(manifestPath string, mf manifestFile) ([]lokexupload.BatchUploadItem, error) {
 	manifestDir := filepath.Dir(manifestPath)
 
@@ -144,76 +99,6 @@ func buildBatchUploadItems(manifestPath string, mf manifestFile) ([]lokexupload.
 	}
 
 	return items, nil
-}
-
-func printBatchUploadResult(
-	cmd *cobra.Command,
-	result lokexupload.BatchUploadResult,
-	poll bool,
-) {
-	var successCount int
-	var failedCount int
-
-	for _, item := range result.Items {
-		if item.Err != nil {
-			failedCount++
-		} else {
-			successCount++
-		}
-
-		printBatchItemResult(cmd, item, poll)
-	}
-
-	printBatchSummary(
-		cmd,
-		len(result.Items),
-		successCount,
-		failedCount,
-	)
-}
-
-func printBatchItemResult(
-	cmd *cobra.Command,
-	item lokexupload.BatchUploadResultItem,
-	poll bool,
-) {
-	if item.Err != nil {
-		cmd.Printf(
-			"Upload failed: index=%d src=%q err=%v\n",
-			item.Index,
-			item.SrcPath,
-			item.Err,
-		)
-
-		return
-	}
-
-	if poll {
-		cmd.Printf(
-			"Upload completed: index=%d src=%q process_id=%s\n",
-			item.Index,
-			item.SrcPath,
-			item.ProcessID,
-		)
-
-		return
-	}
-
-	cmd.Printf(
-		"Upload started: index=%d src=%q process_id=%s\n",
-		item.Index,
-		item.SrcPath,
-		item.ProcessID,
-	)
-}
-
-func printBatchSummary(cmd *cobra.Command, total, success, failed int) {
-	cmd.Printf(
-		"Batch summary: total=%d success=%d failed=%d\n",
-		total,
-		success,
-		failed,
-	)
 }
 
 func validateManifestItem(item manifestItem, index int) error {

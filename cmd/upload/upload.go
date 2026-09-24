@@ -3,7 +3,6 @@ package upload
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -155,24 +154,4 @@ func performUpload(
 	poll bool,
 ) (string, error) {
 	return up.Upload(ctx, params, srcPath, poll)
-}
-
-func printUploadResult(cmd *cobra.Command, result string, poll bool) {
-	result = strings.TrimSpace(result)
-
-	if result == "" {
-		if poll {
-			cmd.Println("Upload completed (process ID unknown)")
-			return
-		}
-		cmd.Println("Upload started (process ID unknown)")
-		return
-	}
-
-	if poll {
-		cmd.Printf("Upload completed: %s\n", result)
-		return
-	}
-
-	cmd.Printf("Upload started: %s\n", result)
 }
