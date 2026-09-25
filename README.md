@@ -7,9 +7,11 @@
 
 `lokex-cli` is a focused CLI built specifically for **file exchange with Lokalise** on top of [`lokex`](https://github.com/bodrovis/lokex).
 
-It is intentionally narrow in scope, so you can only upload and download files. This tool is meant to be a fast, optimized workflow for import/export operations.
+It is intentionally narrow in scope and focuses on file-oriented workflows: uploading files, downloading files, and generating upload manifests from local project structures.
 
-If you need a broader Lokalise command set, use the [official CLI instead](https://github.com/lokalise/lokalise-cli-2-go). 
+The CLI is optimized for import/export workflows and direct access to file-related API parameters, without trying to cover the full Lokalise feature set.
+
+> If you need a broader Lokalise command set, use the [official CLI instead](https://github.com/lokalise/lokalise-cli-2-go).
 
 ## Installation
 
