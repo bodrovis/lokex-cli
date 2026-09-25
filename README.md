@@ -76,21 +76,22 @@ Detailed command docs are generated in:
 
 - [`docs/lokex-cli_upload.md`](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli_upload.md)
 - [`docs/lokex-cli_download.md`](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli_download.md)
+- [`docs/lokex-cli_manifest_generate.md`](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli_manifest_generate.md)
 
-Those files list all supported flags and API-related parameters for each command.
+Those files list all supported flags for each command.
 
 ## Global flags
 
-These flags are shared by both `upload` and `download`.
+Global flags configure access to Lokalise and shared CLI behavior.
 
-> [Find full list of global flags in the docs](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli.md).
+> [Find the full list of global flags in the docs](https://github.com/bodrovis/lokex-cli/blob/master/docs/lokex-cli.md).
 
-### Required in all cases
+### Required for upload and download
 
-These two flags are always required:
+The `upload` and `download` commands require:
 
-- `--token`
-- `--project-id`
+* `--token`
+* `--project-id`
 
 Example:
 
@@ -99,6 +100,18 @@ lokex-cli download \
   --token YOUR_TOKEN \
   --project-id YOUR_PROJECT_ID \
   --format json
+```
+
+These values can also be provided through environment variables or the YAML config file.
+
+The `manifest generate` command works entirely with local files and does not access the Lokalise API. It does not require `--token` or `--project-id`.
+
+For example:
+
+```bash
+lokex-cli manifest generate \
+  --path ./locales \
+  --name-pattern "{lang}/{name}.{ext}"
 ```
 
 ## Download examples
