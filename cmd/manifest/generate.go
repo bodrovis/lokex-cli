@@ -26,55 +26,97 @@ The command scans the paths provided with --path, filters excluded files,
 matches each remaining file against --name-pattern, and generates an upload
 manifest that can later be passed to "lokex upload --manifest".
 
-The name pattern describes the structure of local file paths and supports
-the following placeholders:
+The name pattern describes the structure of local file paths.
 
-  {lang}  Language code detected from the path
-  {name}  File name without the extension
-  {ext}   File extension
+Patterns support:
+  *         Any characters within a single path segment
+  **        Any number of directories
+  {lang}    Language code
+  {name}    File name
+  {ext}     File extension
+
+You can also use custom placeholders such as {app}, {module}, or {namespace}.
+Values captured by placeholders can be reused in --filename-pattern.
 
 For example:
 
-  --path ./locales
-  --name-pattern "{lang}/{name}.{ext}"
+  --path ./apps
+  --name-pattern "{app}/locales/{lang}/{name}.{ext}"
+  --filename-pattern "{app}/{name}.{ext}"
+
+matches:
+
+  apps/mobile/locales/en/common.json
+
+and generates:
+
+  filename = mobile/common.json
+  lang_iso = en
+
+Use ** when the directory depth is not fixed. For example:
+
+  --name-pattern "**/locales/{lang}.{ext}"
 
 matches files such as:
 
-  locales/en/common.json
-  locales/de/common.json
+  apps/mobile/locales/en.json
+  packages/shared/locales/de.json
+  locales/fr.json
 
-The filename pattern controls the filename stored in the upload manifest.
-Its default value is "{name}.{ext}".
+Neither {name} nor {ext} is required. For files named only by language,
+for example en.json and de.json, use:
 
-Generated source paths are relative to the manifest file location,
-so the manifest can be used from any working directory.
+  --name-pattern "{lang}.{ext}"
 
-If the name pattern does not contain {lang}, use --base-lang to assign
-a language to matching files.
+If the name pattern does not contain {lang}, use --base-lang to assign a
+language to matching files.
+
+The filename pattern controls the filename stored in Lokalise. Its default
+value is "{name}.{ext}". Any placeholder used by the filename pattern must
+be provided by the name pattern, except {lang}, which can also come from
+--base-lang.
+
+Generated source paths are relative to the manifest file location when
+possible. If the source and manifest are on different filesystem volumes,
+an absolute source path is stored instead.
 
 Use --out=- to print the generated manifest to stdout instead of writing
 it to a file.`,
-		Example: `  # Generate a manifest from a nested language directory
+		Example: `  # Files named by language: en.json, de.json, fr.json
   lokex manifest generate \
     --path ./locales \
-    --name-pattern "{lang}/{name}.{ext}"
+    --name-pattern "{lang}.{ext}" \
+    --filename-pattern "{lang}.{ext}"
 
-  # Use one language for files without a language in their names
+  # Language directories: en/common.json, de/common.json
+  lokex manifest generate \
+    --path ./locales \
+    --name-pattern "{lang}/{name}.{ext}" \
+    --filename-pattern "{name}.{ext}"
+
+  # Match locales directories at any depth
+  lokex manifest generate \
+    --path . \
+    --name-pattern "**/locales/{lang}.{ext}" \
+    --filename-pattern "{lang}.{ext}"
+
+  # Preserve application names in a monorepo
+  lokex manifest generate \
+    --path ./apps \
+    --name-pattern "{app}/locales/{lang}.{ext}" \
+    --filename-pattern "{app}/{lang}.{ext}"
+
+  # Use one language when it is not present in the path
   lokex manifest generate \
     --path ./locales \
     --name-pattern "{name}.{ext}" \
     --base-lang en
 
-  # Exclude generated or test files
+  # Exclude test files
   lokex manifest generate \
     --path ./locales \
     --name-pattern "{lang}/{name}.{ext}" \
     --exclude-pattern "**/*.test.json"
-
-  # Generate a manifest for flat filenames
-  lokex manifest generate \
-    --path ./locales \
-    --name-pattern "{name}.{lang}.{ext}"
 
   # Print the manifest to stdout
   lokex manifest generate \
@@ -164,13 +206,6 @@ func validateGenerateConfig(
 		)
 	}
 
-	if !strings.Contains(namePattern, "{lang}") &&
-		ptrutil.TrimmedString(cfg.BaseLang) == "" {
-		return errors.New(
-			"base-lang is required when name-pattern does not contain {lang}",
-		)
-	}
-
 	filenamePattern := ptrutil.TrimmedString(
 		cfg.FilenamePattern,
 	)
@@ -181,6 +216,30 @@ func validateGenerateConfig(
 
 	if err := uploadmanifest.ValidateRenderPattern(
 		filenamePattern,
+	); err != nil {
+		return fmt.Errorf(
+			"invalid filename-pattern: %w",
+			err,
+		)
+	}
+
+	baseLang := ptrutil.TrimmedString(
+		cfg.BaseLang,
+	)
+
+	if !strings.Contains(
+		namePattern,
+		"{lang}",
+	) && baseLang == "" {
+		return errors.New(
+			"base-lang is required when name-pattern does not contain {lang}",
+		)
+	}
+
+	if err := uploadmanifest.ValidatePatternSources(
+		namePattern,
+		filenamePattern,
+		baseLang,
 	); err != nil {
 		return fmt.Errorf(
 			"invalid filename-pattern: %w",

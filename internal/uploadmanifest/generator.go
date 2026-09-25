@@ -80,7 +80,7 @@ func Generate(
 func validateGenerateOptions(
 	opts GenerateOptions,
 ) error {
-	if len(opts.Paths) == 0 {
+	if len(nonEmptyStrings(opts.Paths)) == 0 {
 		return errors.New("no paths provided")
 	}
 
@@ -133,8 +133,12 @@ func validateGenerateOptions(
 func discoverGenerateFiles(
 	opts GenerateOptions,
 ) ([]DiscoveredFile, error) {
-	files, err := DiscoverFiles(
+	paths := nonEmptyStrings(
 		opts.Paths,
+	)
+
+	files, err := DiscoverFiles(
+		paths,
 	)
 	if err != nil {
 		return nil, err
@@ -149,6 +153,31 @@ func discoverGenerateFiles(
 	}
 
 	return files, nil
+}
+
+func nonEmptyStrings(
+	values []string,
+) []string {
+	result := make(
+		[]string,
+		0,
+		len(values),
+	)
+
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+
+		if value == "" {
+			continue
+		}
+
+		result = append(
+			result,
+			value,
+		)
+	}
+
+	return result
 }
 
 func buildGeneratedItem(

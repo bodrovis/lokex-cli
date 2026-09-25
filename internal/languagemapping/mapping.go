@@ -47,11 +47,9 @@ func Parse(
 			)
 		}
 
-		mappings[i].OriginalLanguageISO =
-			strings.TrimSpace(mapping.OriginalLanguageISO)
+		mappings[i].OriginalLanguageISO = strings.TrimSpace(mapping.OriginalLanguageISO)
 
-		mappings[i].CustomLanguageISO =
-			strings.TrimSpace(mapping.CustomLanguageISO)
+		mappings[i].CustomLanguageISO = strings.TrimSpace(mapping.CustomLanguageISO)
 	}
 
 	return mappings, nil
@@ -70,8 +68,7 @@ func ToMap(
 	)
 
 	for _, mapping := range mappings {
-		result[mapping.OriginalLanguageISO] =
-			mapping.CustomLanguageISO
+		result[mapping.OriginalLanguageISO] = mapping.CustomLanguageISO
 	}
 
 	return result

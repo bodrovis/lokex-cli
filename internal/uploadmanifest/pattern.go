@@ -103,6 +103,15 @@ func ValidateRenderPattern(
 		return errors.New("render pattern is empty")
 	}
 
+	if strings.Contains(
+		pattern,
+		"*",
+	) {
+		return errors.New(
+			"render pattern must not contain wildcards",
+		)
+	}
+
 	_, err := patternPlaceholders(pattern)
 
 	return err

@@ -99,6 +99,7 @@ func TestManifestCommand_RejectsArguments(t *testing.T) {
 
 	require.Error(t, err)
 }
+
 func TestGenerateCommand_PreRunE_NilState(t *testing.T) {
 	cmd := newGenerateCommand(nil)
 

@@ -378,3 +378,62 @@ func TestMatchAndRenderPatterns(t *testing.T) {
 		),
 	)
 }
+
+func TestValidateRenderPattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		pattern string
+		wantErr string
+	}{
+		{
+			name:    "name and extension",
+			pattern: "{name}.{ext}",
+		},
+		{
+			name:    "custom placeholder",
+			pattern: "{app}/{name}.{ext}",
+		},
+		{
+			name:    "literal filename",
+			pattern: "translations.json",
+		},
+		{
+			name:    "single wildcard",
+			pattern: "*/{name}.{ext}",
+			wantErr: "render pattern must not contain wildcards",
+		},
+		{
+			name:    "globstar",
+			pattern: "**/{name}.{ext}",
+			wantErr: "render pattern must not contain wildcards",
+		},
+		{
+			name:    "empty",
+			pattern: "",
+			wantErr: "render pattern is empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := ValidateRenderPattern(
+				tt.pattern,
+			)
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+
+			require.EqualError(
+				t,
+				err,
+				tt.wantErr,
+			)
+		})
+	}
+}
