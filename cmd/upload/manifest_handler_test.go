@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 
 	"github.com/bodrovis/lokex-cli/internal/global_config"
+	"github.com/bodrovis/lokex-cli/internal/uploadmanifest"
 	lokexupload "github.com/bodrovis/lokex/v2/client/upload"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -114,11 +114,11 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(path string) (manifestFile, error) {
+		loadManifestFileFunc = func(path string) (uploadmanifest.File, error) {
 			require.Equal(t, "./manifest.json", path)
 
-			return manifestFile{
-				Items: []manifestItem{
+			return uploadmanifest.File{
+				Items: []uploadmanifest.Item{
 					{
 						Params: lokexupload.UploadParams{
 							"filename": "locales/en.json",
@@ -132,7 +132,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 
 		buildBatchUploadItemsFunc = func(
 			manifestPath string,
-			mf manifestFile,
+			mf uploadmanifest.File,
 		) ([]lokexupload.BatchUploadItem, error) {
 			require.Equal(t, "./manifest.json", manifestPath)
 			require.Len(t, mf.Items, 1)
@@ -229,9 +229,9 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(string) (manifestFile, error) {
-			return manifestFile{
-				Items: []manifestItem{
+		loadManifestFileFunc = func(string) (uploadmanifest.File, error) {
+			return uploadmanifest.File{
+				Items: []uploadmanifest.Item{
 					{
 						Params: lokexupload.UploadParams{
 							"filename": "locales/de.json",
@@ -245,7 +245,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 
 		buildBatchUploadItemsFunc = func(
 			string,
-			manifestFile,
+			uploadmanifest.File,
 		) ([]lokexupload.BatchUploadItem, error) {
 			return []lokexupload.BatchUploadItem{
 				{
@@ -328,8 +328,8 @@ func TestRunCommand_WithManifest(t *testing.T) {
 
 		wantErr := errors.New("bad manifest")
 
-		loadManifestFileFunc = func(string) (manifestFile, error) {
-			return manifestFile{}, wantErr
+		loadManifestFileFunc = func(string) (uploadmanifest.File, error) {
+			return uploadmanifest.File{}, wantErr
 		}
 
 		cfg := &global_config.GlobalConfig{
@@ -374,9 +374,9 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(string) (manifestFile, error) {
-			return manifestFile{
-				Items: []manifestItem{
+		loadManifestFileFunc = func(string) (uploadmanifest.File, error) {
+			return uploadmanifest.File{
+				Items: []uploadmanifest.Item{
 					{
 						Params: lokexupload.UploadParams{
 							"filename": "locales/en.json",
@@ -391,7 +391,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 
 		buildBatchUploadItemsFunc = func(
 			string,
-			manifestFile,
+			uploadmanifest.File,
 		) ([]lokexupload.BatchUploadItem, error) {
 			return nil, wantErr
 		}
@@ -440,9 +440,9 @@ func TestRunCommand_WithManifest(t *testing.T) {
 			return mu, nil
 		}
 
-		loadManifestFileFunc = func(string) (manifestFile, error) {
-			return manifestFile{
-				Items: []manifestItem{
+		loadManifestFileFunc = func(string) (uploadmanifest.File, error) {
+			return uploadmanifest.File{
+				Items: []uploadmanifest.Item{
 					{
 						Params: lokexupload.UploadParams{
 							"filename": "locales/en.json",
@@ -456,7 +456,7 @@ func TestRunCommand_WithManifest(t *testing.T) {
 
 		buildBatchUploadItemsFunc = func(
 			string,
-			manifestFile,
+			uploadmanifest.File,
 		) ([]lokexupload.BatchUploadItem, error) {
 			return []lokexupload.BatchUploadItem{
 				{
@@ -505,333 +505,6 @@ func TestRunCommand_WithManifest(t *testing.T) {
 		)
 
 		require.False(t, mu.uploadCalled)
-	})
-}
-
-func TestBuildBatchUploadItems(t *testing.T) {
-	t.Run("relative src_path is resolved against manifest directory", func(t *testing.T) {
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"filename": "locales/en.json",
-						"lang_iso": "en",
-					},
-					SrcPath: "en.json",
-				},
-			},
-		}
-
-		items, err := buildBatchUploadItems(
-			"/configs/manifest.json",
-			mf,
-		)
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-
-		assert.Equal(
-			t,
-			filepath.Join("/configs", "en.json"),
-			items[0].SrcPath,
-		)
-	})
-
-	t.Run("absolute src_path is preserved", func(t *testing.T) {
-		absPath := filepath.Join(
-			t.TempDir(),
-			"en.json",
-		)
-
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"filename": "locales/en.json",
-						"lang_iso": "en",
-					},
-					SrcPath: absPath,
-				},
-			},
-		}
-
-		items, err := buildBatchUploadItems(
-			filepath.Join("configs", "manifest.json"),
-			mf,
-		)
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-
-		assert.Equal(t, absPath, items[0].SrcPath)
-	})
-
-	t.Run("empty src_path is preserved", func(t *testing.T) {
-		mf := manifestFile{
-			Items: []manifestItem{
-				{
-					Params: lokexupload.UploadParams{
-						"filename": "locales/en.json",
-						"lang_iso": "en",
-					},
-				},
-			},
-		}
-
-		items, err := buildBatchUploadItems(
-			"/configs/manifest.json",
-			mf,
-		)
-		require.NoError(t, err)
-		require.Len(t, items, 1)
-
-		assert.Empty(t, items[0].SrcPath)
-	})
-
-	tests := []struct {
-		name   string
-		params lokexupload.UploadParams
-		want   string
-	}{
-		{
-			name: "missing filename",
-			params: lokexupload.UploadParams{
-				"lang_iso": "en",
-			},
-			want: "params.filename is required",
-		},
-		{
-			name: "missing lang_iso",
-			params: lokexupload.UploadParams{
-				"filename": "locales/en.json",
-			},
-			want: "params.lang_iso is required",
-		},
-		{
-			name: "whitespace filename",
-			params: lokexupload.UploadParams{
-				"filename": "   ",
-				"lang_iso": "en",
-			},
-			want: "params.filename is required",
-		},
-		{
-			name: "whitespace lang_iso",
-			params: lokexupload.UploadParams{
-				"filename": "locales/en.json",
-				"lang_iso": "   ",
-			},
-			want: "params.lang_iso is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mf := manifestFile{
-				Items: []manifestItem{
-					{
-						Params: tt.params,
-					},
-				},
-			}
-
-			_, err := buildBatchUploadItems(
-				"/configs/manifest.json",
-				mf,
-			)
-
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.want)
-		})
-	}
-}
-
-func TestRequiredManifestString(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		params := lokexupload.UploadParams{
-			"filename": "  en.json  ",
-		}
-
-		got, ok := requiredManifestString(params, "filename")
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
-		if got != "en.json" {
-			t.Fatalf("unexpected value: got %q, want %q", got, "en.json")
-		}
-	})
-
-	t.Run("missing key", func(t *testing.T) {
-		params := lokexupload.UploadParams{}
-
-		got, ok := requiredManifestString(params, "filename")
-		if ok {
-			t.Fatal("expected ok=false")
-		}
-		if got != "" {
-			t.Fatalf("unexpected value: %q", got)
-		}
-	})
-
-	t.Run("non string value", func(t *testing.T) {
-		params := lokexupload.UploadParams{
-			"filename": 123,
-		}
-
-		got, ok := requiredManifestString(params, "filename")
-		if ok {
-			t.Fatal("expected ok=false")
-		}
-		if got != "" {
-			t.Fatalf("unexpected value: %q", got)
-		}
-	})
-
-	t.Run("whitespace string", func(t *testing.T) {
-		params := lokexupload.UploadParams{
-			"filename": "   ",
-		}
-
-		got, ok := requiredManifestString(params, "filename")
-		if ok {
-			t.Fatal("expected ok=false")
-		}
-		if got != "" {
-			t.Fatalf("unexpected value: %q", got)
-		}
-	})
-}
-
-func TestValidateManifestItem(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": "en.json",
-				"lang_iso": "en",
-			},
-		}
-
-		err := validateManifestItem(item, 3)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("missing params", func(t *testing.T) {
-		item := manifestItem{}
-
-		err := validateManifestItem(item, 1)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 1: params is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("missing filename", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"lang_iso": "en",
-			},
-		}
-
-		err := validateManifestItem(item, 2)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 2: params.filename is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("missing lang_iso", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": "en.json",
-			},
-		}
-
-		err := validateManifestItem(item, 4)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 4: params.lang_iso is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("whitespace filename", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": "   ",
-				"lang_iso": "en",
-			},
-		}
-
-		err := validateManifestItem(item, 5)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 5: params.filename is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("whitespace lang_iso", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": "en.json",
-				"lang_iso": "   ",
-			},
-		}
-
-		err := validateManifestItem(item, 6)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 6: params.lang_iso is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("non string filename", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": 123,
-				"lang_iso": "en",
-			},
-		}
-
-		err := validateManifestItem(item, 7)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 7: params.filename is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
-	})
-
-	t.Run("non string lang_iso", func(t *testing.T) {
-		item := manifestItem{
-			Params: lokexupload.UploadParams{
-				"filename": "en.json",
-				"lang_iso": false,
-			},
-		}
-
-		err := validateManifestItem(item, 8)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		want := "manifest item 8: params.lang_iso is required"
-		if err.Error() != want {
-			t.Fatalf("unexpected error: got %q, want %q", err.Error(), want)
-		}
 	})
 }
 

@@ -1,3 +1,5 @@
+github.com/bmatcuk/doublestar/v4 v4.10.2 h1:eF7W7HWKg3z9NrWV9pTLnNeoXaqq3Tq9DNKXVMfoCnw=
+github.com/bmatcuk/doublestar/v4 v4.10.2/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/bodrovis/lokex/v2 v2.4.0 h1:MbECSV4NDo922wSmtTWSr5B4II0FbCWSNz49fdGV1pY=
 github.com/bodrovis/lokex/v2 v2.4.0/go.mod h1:DJUSMMxdn3fTDCrBKcKSW885wSa+k3x4i8K6hKcNYG8=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=

@@ -1,11 +1,11 @@
 package download
 
 import (
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/bodrovis/lokex-cli/internal/languagemapping"
 	lokexdownload "github.com/bodrovis/lokex/v2/client/download"
 )
 
@@ -82,31 +82,15 @@ func applyLanguageMapping(
 		return nil
 	}
 
-	languageMapping, err := parseLanguageMapping(value)
+	mapping, err := languagemapping.Parse(value)
 	if err != nil {
-		return fmt.Errorf("parse language-mapping: %w", err)
+		return fmt.Errorf(
+			"parse language-mapping: %w",
+			err,
+		)
 	}
 
-	req["language_mapping"] = languageMapping
+	req["language_mapping"] = mapping
 
 	return nil
-}
-
-type languageMapping struct {
-	OriginalLanguageISO string `json:"original_language_iso"`
-	CustomLanguageISO   string `json:"custom_language_iso"`
-}
-
-func parseLanguageMapping(raw string) ([]languageMapping, error) {
-	var out []languageMapping
-
-	if err := json.Unmarshal(
-		[]byte(raw),
-		&out,
-		json.RejectUnknownMembers(true),
-	); err != nil {
-		return nil, err
-	}
-
-	return out, nil
 }
