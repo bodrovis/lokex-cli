@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          UPX_VERSION="5.2.0"
+          UPX_VERSION="5.2.1"
           UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
           UPX_SHA256="3db5d3294707439db97866feab8d75d800f028f48481a40547411824da4288a1"
 

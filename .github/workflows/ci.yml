@@ -22,7 +22,6 @@ jobs:
         check-latest: false
         cache: false
         
-
     - name: Check Go modules
       run: |
         set -euo pipefail
