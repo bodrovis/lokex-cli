@@ -218,6 +218,80 @@ func TestLoadGenerateConfig_FlagOverridesEnvAndConfig(t *testing.T) {
 	)
 }
 
+func TestLoadGenerateConfig_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil viper", func(t *testing.T) {
+		t.Parallel()
+
+		err := LoadGenerateConfig(
+			nil,
+			newGenerateTestCommand(),
+			&GenerateConfig{},
+		)
+
+		require.EqualError(t, err, "viper is nil")
+	})
+
+	t.Run("nil command", func(t *testing.T) {
+		t.Parallel()
+
+		err := LoadGenerateConfig(
+			viper.New(),
+			nil,
+			&GenerateConfig{},
+		)
+
+		require.EqualError(
+			t,
+			err,
+			"manifest generate command is nil",
+		)
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		t.Parallel()
+
+		err := LoadGenerateConfig(
+			viper.New(),
+			newGenerateTestCommand(),
+			nil,
+		)
+
+		require.EqualError(
+			t,
+			err,
+			"manifest generate config is nil",
+		)
+	})
+
+	t.Run("decode error", func(t *testing.T) {
+		t.Parallel()
+
+		v := viper.New()
+
+		v.Set(
+			"manifest.generate.path",
+			map[string]any{
+				"unexpected": "value",
+			},
+		)
+
+		err := LoadGenerateConfig(
+			v,
+			newGenerateTestCommand(),
+			&GenerateConfig{},
+		)
+
+		require.Error(t, err)
+		require.ErrorContains(
+			t,
+			err,
+			"decode manifest generate config",
+		)
+	})
+}
+
 func newGenerateTestCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "generate",

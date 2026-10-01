@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.2
-	github.com/bodrovis/lokex/v2 v2.4.0
+	github.com/bodrovis/lokex/v2 v2.4.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
