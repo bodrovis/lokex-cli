@@ -40,7 +40,7 @@ jobs:
 
           UPX_VERSION="5.2.1"
           UPX_ARCHIVE="upx-${UPX_VERSION}-amd64_linux.tar.xz"
-          UPX_SHA256="3db5d3294707439db97866feab8d75d800f028f48481a40547411824da4288a1"
+          UPX_SHA256="0019DFC4B32D63C1392AA264AED2253C1E0C2FB09216F8E2CC269BBFB8BB49B5"
 
           TMP_DIR="$(mktemp -d)"
           trap 'rm -rf "$TMP_DIR"' EXIT
