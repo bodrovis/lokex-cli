@@ -32,6 +32,7 @@ jobs:
         with:
           go-version-file: go.mod
           check-latest: false
+          cache: false
 
       - name: Install verified UPX
         shell: bash
